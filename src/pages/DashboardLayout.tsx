@@ -352,15 +352,12 @@ export default function DashboardLayout() {
                             </tr>
                           )}
                           {inWindowViolations.map((v, idx) => {
-                            const thzClass = v.thz === 'H' ? 'thz-h' : v.thz === 'M' ? 'thz-m' : 'thz-l';
-                            const hazardLabel = v.thz === 'H' ? 'High Hazard' : v.thz === 'M' ? 'Medium Hazard' : 'Low Hazard';
-                            const hazardColor = v.thz === 'H' ? 'var(--red)' : v.thz === 'M' ? 'var(--amber)' : 'var(--accent2)';
                             const statusClass = v.status === 'Paid' ? 'status-paid' : v.status === 'Open' ? 'status-unpaid' : 'status-court';
                             return (
                               <tr key={`${v.type}-${v.date}-${idx}`}>
                                 <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.date}</td>
-                                <td><div className="violation-type">{v.type}<span className={`thz-tag ${thzClass}`}>THZ-{v.thz}</span></div></td>
-                                <td style={{ fontSize: 11, color: hazardColor }}>{hazardLabel}</td>
+                                <td><div className="violation-type">{v.type}<span className="thz-tag">{v.code}</span></div></td>
+                                <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.code}</td>
                                 <td><span className={statusClass}>{v.status.toUpperCase()}</span></td>
                                 <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.multiplier}×</td>
                                 <td><span className={v.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>–{v.impactPoints} pts</span></td>

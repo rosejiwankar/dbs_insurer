@@ -3,6 +3,7 @@ import { useScoreLookup } from '../hooks/useScoreLookup';
 import ScoreGauge from '../components/ScoreGauge';
 import BandBadge from '../components/BandBadge';
 import { ScoreResult } from '../types/score';
+import { classifyOffence } from '../utils/dbsScoring';
 
 const sampleRegs = [
   'MH31AB1234',
@@ -130,16 +131,16 @@ export default function VehicleLookup() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.violations.map((v, idx) => (
-                    <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 py-2">{v.type}</td>
-                      <td className="px-3 py-2">{v.date}</td>
-                      <td className="px-3 py-2">{v.location}</td>
-                      <td className="px-3 py-2">{v.thz}</td>
-                      <td className="px-3 py-2">{v.status}</td>
-                      <td className="px-3 py-2">{v.impact}</td>
-                    </tr>
-                  ))}
+	                  {result.violations.map((v, idx) => (
+	                    <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50">
+	                      <td className="px-3 py-2">{v.type}</td>
+	                      <td className="px-3 py-2">{v.date}</td>
+	                      <td className="px-3 py-2">{v.location}</td>
+	                      <td className="px-3 py-2">{classifyOffence(v.type).code}</td>
+	                      <td className="px-3 py-2">{v.status}</td>
+	                      <td className="px-3 py-2">{v.impact}</td>
+	                    </tr>
+	                  ))}
                 </tbody>
               </table>
             </div>
