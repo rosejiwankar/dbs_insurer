@@ -4,7 +4,19 @@ import ScoreGauge from '../components/ScoreGauge';
 import BandBadge from '../components/BandBadge';
 import { ScoreResult } from '../types/score';
 
-const sampleRegs = ['MH31AB1234', 'UP32CD5678', 'DL8CAF9012', 'KA01MN3456'];
+const sampleRegs = [
+  'MH31AB1234',
+  'UP32CD5678',
+  'DL8CAF9012',
+  'KA01MN3456',
+  'TN09GH1122',
+  'RJ14KL7788',
+  'GJ05QW3344',
+  'AP39ZX5566',
+  'HR26TT9090',
+  'WB20LM4433',
+  'MP09RS7711'
+];
 
 export default function VehicleLookup() {
   const [input, setInput] = useState<string>('');

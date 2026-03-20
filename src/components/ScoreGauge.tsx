@@ -7,9 +7,8 @@ interface ScoreGaugeProps {
 }
 
 export default function ScoreGauge({ score, band }: ScoreGaugeProps) {
-  const normalized = Math.max(0, Math.min(900, score));
-  const scoreOutOf300 = Math.round((normalized / 900) * 300);
-  const angle = (scoreOutOf300 / 300) * 180;
+  const normalized = Math.max(0, Math.min(300, score));
+  const angle = (normalized / 300) * 180;
   const color = scoreColor(band);
 
   const radius = 80;
@@ -44,8 +43,8 @@ export default function ScoreGauge({ score, band }: ScoreGaugeProps) {
           <circle cx={centerX} cy={centerY} r="5" fill="#ffffff" stroke="#94a3b8" strokeWidth="2" />
         </svg>
       </div>
-      <div className="text-3xl font-bold text-slate-900">{scoreOutOf300}</div>
-      <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600">{band.replace('_', ' ')}</div>
+      <div className="text-3xl font-bold text-slate-900">{normalized}</div>
+      <div className="text-xs font-semibold uppercase tracking-widest text-emerald-600">{band.replace(/_/g, ' ')}</div>
     </div>
   );
 }

@@ -1,4 +1,14 @@
-export type ScoreBand = 'EXCELLENT' | 'GOOD' | 'AVERAGE' | 'POOR' | 'HIGH_RISK';
+export type ScoreBand =
+  | 'EXEMPLARY'
+  | 'RESPONSIBLE'
+  | 'AVERAGE'
+  | 'MARGINAL'
+  | 'AT_RISK'
+  | 'HIGH_RISK'
+  | 'SERIOUS_RISK'
+  | 'CHRONIC_VIOLATOR'
+  | 'HABITUAL_OFFENDER'
+  | 'EXTREME_RISK';
 
 export interface Violation {
   type: string;

@@ -3,6 +3,7 @@ import { usePortfolioData } from '../hooks/usePortfolioData';
 
 export default function PortfolioAnalytics() {
   const { kpis, distribution } = usePortfolioData();
+  const formatBand = (band: string) => band.replace(/_/g, ' ');
 
   return (
     <div className="space-y-5">
@@ -32,9 +33,9 @@ export default function PortfolioAnalytics() {
         <div className="mt-4 h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={distribution.data || []}>
-              <XAxis dataKey="band" />
+              <XAxis dataKey="band" tickFormatter={formatBand} />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip formatter={(value, name) => [value, name]} labelFormatter={formatBand} />
               <Bar dataKey="count" fill="#2563eb" />
             </BarChart>
           </ResponsiveContainer>

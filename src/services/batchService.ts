@@ -1,5 +1,6 @@
 import { ScoreResult } from '../types/score';
 import { sampleVehicleScores } from './mockData';
+import { calculateScoreFromViolations } from '../utils/dbsScoring';
 
 export interface BatchRow {
   reg_no: string;
@@ -22,10 +23,11 @@ export async function submitBatch(rows: BatchRow[]): Promise<{ batchId: string }
     status: 'queued',
     rows: rows.map((r) => {
       const entry = sampleVehicleScores[r.reg_no.toUpperCase().replace(/\s+/g, '')];
+      const computed = entry ? calculateScoreFromViolations(entry.violations) : null;
       return {
         reg_no: r.reg_no,
-        score: entry?.score ?? null,
-        band: entry?.band ?? 'NOT_FOUND',
+        score: computed?.score ?? null,
+        band: computed?.band ?? 'NOT_FOUND',
         tpLoading: entry?.tpLoading ?? 0
       };
     })

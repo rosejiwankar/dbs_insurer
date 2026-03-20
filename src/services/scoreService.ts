@@ -1,5 +1,6 @@
 import { ScoreResult } from '../types/score';
 import { sampleVehicleScores } from './mockData';
+import { calculateScoreFromViolations, premiumAdjustmentPercent } from '../utils/dbsScoring';
 
 export async function fetchScore(regNo: string): Promise<ScoreResult> {
   await new Promise((resolve) => setTimeout(resolve, 350));
@@ -8,5 +9,14 @@ export async function fetchScore(regNo: string): Promise<ScoreResult> {
   if (!data) {
     throw new Error('not_found');
   }
-  return data;
+  const { score, band } = calculateScoreFromViolations(data.violations);
+  const basePremium = 2094;
+  const adjustment = premiumAdjustmentPercent(band);
+  const tpLoading = Math.round((basePremium * adjustment) / 100);
+  return {
+    ...data,
+    score,
+    band,
+    tpLoading
+  };
 }

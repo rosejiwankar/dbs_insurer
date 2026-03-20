@@ -243,18 +243,23 @@ body {
 .recent-item:hover { background: var(--surface2); }
 .recent-reg { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); letter-spacing: 0.05em; flex: 1; }
 .recent-band { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
-.band-excellent { background: #d1fae5; color: #065f46; }
-.band-good { background: #dbeafe; color: #1e40af; }
-.band-average { background: #fef3c7; color: #92400e; }
-.band-poor { background: #ffedd5; color: #9a3412; }
+.band-exemplary { background: #d1fae5; color: #065f46; }
+.band-responsible { background: #dcfce7; color: #166534; }
+.band-average { background: #bbf7d0; color: #166534; }
+.band-marginal { background: #fef3c7; color: #92400e; }
+.band-at-risk { background: #ffedd5; color: #9a3412; }
 .band-high-risk { background: #fee2e2; color: #991b1b; }
+.band-serious-risk { background: #fecaca; color: #b91c1c; }
+.band-chronic-violator { background: #fca5a5; color: #7f1d1d; }
+.band-habitual-offender { background: #f87171; color: #7f1d1d; }
+.band-extreme-risk { background: #fee2e2; color: #7f1d1d; }
 .result-panel { display: flex; flex-direction: column; gap: 16px; }
 .score-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
 .vehicle-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
 .vehicle-reg { font-family: 'DM Mono', monospace; font-size: 22px; color: var(--text); letter-spacing: 0.08em; }
 .vehicle-meta { display: flex; gap: 16px; margin-top: 4px; }
-.vehicle-meta span { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
-.query-time { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); text-align: right; }
+.vehicle-meta span { font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 4px; opacity: 0.8; }
+.query-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text2); text-align: right; }
 .score-gauge-area { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: center; }
 .gauge-container { position: relative; width: 200px; height: 110px; }
 .gauge-container svg { width: 200px; height: 110px; }

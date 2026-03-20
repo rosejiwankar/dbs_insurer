@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react';
 import dbsLogo from '../assets/dbs-logo.png';
 import { useAuthStore } from '../store/authStore';
+import { sampleVehicleScores } from '../services/mockData';
+import { calculateScoreFromViolations, premiumAdjustmentPercent, scoreViolations } from '../utils/dbsScoring';
+import { scoreColor } from '../utils/scoreColor';
+import { ScoreBand } from '../types/score';
 
 type TabKey = 'lookup' | 'portfolio' | 'batch' | 'api';
 
@@ -11,29 +15,46 @@ const pageTitles: Record<TabKey, string> = {
   api: 'API Console'
 };
 
-const sampleScores = {
-  MH31AB1234: { score: 841, band: 'Excellent', color: '#34c77b', needle: 72 },
-  UP32CD5678: { score: 521, band: 'Average', color: '#f5a623', needle: -68 },
-  DL8CAF9012: { score: 312, band: 'Poor', color: '#f57c00', needle: -118 },
-  KA01MN3456: { score: 698, band: 'Good', color: '#4f8ef7', needle: 18 }
-};
+const buildScoreMap = () =>
+  Object.fromEntries(
+    Object.entries(sampleVehicleScores).map(([reg, data]) => {
+      const computed = calculateScoreFromViolations(data.violations);
+      return [
+        reg,
+        {
+          score: computed.score,
+          band: computed.band
+            .replace(/_/g, ' ')
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
+          color: scoreColor(computed.band)
+        }
+      ];
+    })
+  );
 
 export default function DashboardLayout() {
   const [activeTab, setActiveTab] = useState<TabKey>('lookup');
   const [regInput, setRegInput] = useState('');
-  const [selected, setSelected] = useState<{score:number;band:string;color:string;needle:number} | null>(null);
+  const [selected, setSelected] = useState<{score:number;band:string;color:string} | null>(null);
+  const [selectedReg, setSelectedReg] = useState('');
   const [showResult, setShowResult] = useState(false);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const user = useAuthStore((s) => s.user);
 
   const activePage = pageTitles[activeTab];
+  const bandClass = (label: string) =>
+    `band-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`;
+  const sampleScores = useMemo(() => buildScoreMap(), []);
+  const bandKeyFromLabel = (label: string) => label.toUpperCase().replace(/\s+/g, '_') as ScoreBand;
 
   const formattedReg = useMemo(() => regInput.toUpperCase().replace(/[^A-Z0-9]/g, ''), [regInput]);
 
   const onQuery = () => {
     if (!formattedReg) return;
     const item = sampleScores[formattedReg as keyof typeof sampleScores];
-    setSelected(item || { score: 742, band: 'Good', color: '#4f8ef7', needle: 12 });
+    setSelected(item || { score: 276, band: 'Responsible', color: '#16a34a' });
+    setSelectedReg(formattedReg);
     setShowResult(true);
   };
 
@@ -42,13 +63,40 @@ export default function DashboardLayout() {
     if (!item) return;
     setRegInput(reg.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1$2 $3 $4'));
     setSelected(item);
+    setSelectedReg(reg);
     setShowResult(true);
   };
 
-  const displayScore = selected ? Math.round(selected.score / 3) : 0;
+  const displayScore = selected ? Math.round(selected.score) : 0;
+  const needleRotation = selected ? (displayScore / 300) * 180 - 90 : -90;
   const arcLength = 267;
   const arcProgress = Math.min(Math.max(displayScore, 0), 300) / 300;
   const arcOffset = arcLength * (1 - arcProgress);
+  const selectedRecord = selectedReg ? sampleVehicleScores[selectedReg] : undefined;
+  const selectedViolations = selectedRecord?.violations ?? [];
+  const now = new Date();
+  const windowStart = new Date(now);
+  windowStart.setMonth(windowStart.getMonth() - 12);
+  const scoredViolations = scoreViolations(selectedViolations, 12, now);
+  const inWindowViolations = scoredViolations;
+  const lastViolation = inWindowViolations[0];
+  const monthsAgo = lastViolation
+    ? Math.max(0, Math.round((now.getTime() - new Date(lastViolation.date).getTime()) / (1000 * 60 * 60 * 24 * 30)))
+    : null;
+  const highCount = inWindowViolations.filter((v) => v.thz === 'H').length;
+  const medCount = inWindowViolations.filter((v) => v.thz === 'M').length;
+  const lowCount = inWindowViolations.filter((v) => v.thz === 'L').length;
+  const totalVehicles = Object.keys(sampleScores).length;
+  const higherScores = Object.values(sampleScores).filter((v) => v.score > (selected?.score ?? 0)).length;
+  const percentile = totalVehicles ? Math.round(((totalVehicles - higherScores) / totalVehicles) * 100) : 0;
+  const basePremium = 2094;
+  const selectedBandKey = selected ? bandKeyFromLabel(selected.band) : undefined;
+  const adjustment = selectedBandKey ? premiumAdjustmentPercent(selectedBandKey) : 0;
+  const tpLoading = Math.round((basePremium * adjustment) / 100);
+  const adjustedPremium = basePremium + tpLoading;
+  const loadingApplicable = adjustment > 0;
+  const adjustmentLabel = adjustment < 0 ? 'Discount Applied' : adjustment > 0 ? 'Loading Applicable' : 'No Loading Applicable';
+  const formatWindowMonth = (d: Date) => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
 
   const logout = () => {
     clearAuth();
@@ -144,7 +192,7 @@ export default function DashboardLayout() {
                     {Object.keys(sampleScores).map((reg) => (
                       <div key={reg} className="recent-item" onClick={() => onSample(reg)}>
                         <span className="recent-reg">{reg.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1 $2 $3 $4')}</span>
-                        <span className={`recent-band band-${sampleScores[reg as keyof typeof sampleScores].band.toLowerCase()}`}>{sampleScores[reg as keyof typeof sampleScores].band}</span>
+                        <span className={`recent-band ${bandClass(sampleScores[reg as keyof typeof sampleScores].band)}`}>{sampleScores[reg as keyof typeof sampleScores].band}</span>
                       </div>
                     ))}
                   </div>
@@ -182,22 +230,28 @@ export default function DashboardLayout() {
                           <svg viewBox="0 0 200 110">
                             <defs>
                               <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#ff4444" stopOpacity="0.35" />
-                                <stop offset="59.7%" stopColor="#ff4444" stopOpacity="0.35" />
-                                <stop offset="69.7%" stopColor="#f97316" stopOpacity="0.35" />
-                                <stop offset="79.7%" stopColor="#eab308" stopOpacity="0.35" />
-                                <stop offset="89.7%" stopColor="#22c55e" stopOpacity="0.35" />
-                                <stop offset="96.3%" stopColor="#16a34a" stopOpacity="0.35" />
+                                <stop offset="0%" stopColor="#7f1d1d" stopOpacity="0.35" />
+                                <stop offset="20%" stopColor="#991b1b" stopOpacity="0.35" />
+                                <stop offset="30%" stopColor="#b91c1c" stopOpacity="0.35" />
+                                <stop offset="40%" stopColor="#dc2626" stopOpacity="0.35" />
+                                <stop offset="50%" stopColor="#ef4444" stopOpacity="0.35" />
+                                <stop offset="60%" stopColor="#f97316" stopOpacity="0.35" />
+                                <stop offset="70%" stopColor="#eab308" stopOpacity="0.35" />
+                                <stop offset="80%" stopColor="#22c55e" stopOpacity="0.35" />
+                                <stop offset="90%" stopColor="#16a34a" stopOpacity="0.35" />
                                 <stop offset="100%" stopColor="#059669" stopOpacity="0.35" />
                               </linearGradient>
                               <linearGradient id="arcGradActive" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#ff4444" />
-                                <stop offset="59.7%" stopColor="#ff4444" />
-                                <stop offset="69.7%" stopColor="#f97316" />
-                                <stop offset="79.7%" stopColor="#eab308" />
-                                <stop offset="89.7%" stopColor="#22c55e" />
-                                <stop offset="96.3%" stopColor="#16a34a" />
-                                <stop offset="100%" stopColor="#059669" />
+                                <stop offset="0%" stopColor="#7f1d1d" stopOpacity="0.9" />
+                                <stop offset="20%" stopColor="#991b1b" stopOpacity="0.9" />
+                                <stop offset="30%" stopColor="#b91c1c" stopOpacity="0.9" />
+                                <stop offset="40%" stopColor="#dc2626" stopOpacity="0.9" />
+                                <stop offset="50%" stopColor="#ef4444" stopOpacity="0.9" />
+                                <stop offset="60%" stopColor="#f97316" stopOpacity="0.9" />
+                                <stop offset="70%" stopColor="#eab308" stopOpacity="0.9" />
+                                <stop offset="80%" stopColor="#22c55e" stopOpacity="0.9" />
+                                <stop offset="90%" stopColor="#16a34a" stopOpacity="0.9" />
+                                <stop offset="100%" stopColor="#059669" stopOpacity="0.9" />
                               </linearGradient>
                             </defs>
                             <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="url(#arcGrad)" strokeWidth="12" strokeLinecap="round" />
@@ -212,7 +266,7 @@ export default function DashboardLayout() {
                               style={{ transition: 'stroke-dashoffset 1.2s ease' }}
                               id="gauge-arc"
                             />
-                            <g id="needle-group" transform={`rotate(${selected.needle} 100 100)`}>
+                            <g id="needle-group" transform={`rotate(${needleRotation} 100 100)`}>
                               <line x1="100" y1="100" x2="100" y2="28" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                               <circle cx="100" cy="100" r="5" fill="white" />
                               <circle cx="100" cy="100" r="2.5" fill="var(--bg)" />
@@ -220,47 +274,51 @@ export default function DashboardLayout() {
                           </svg>
                           <div className="gauge-score-label">
                             <span className="gauge-number" style={{ color: selected.color }}>{displayScore}</span>
-                            <span className="gauge-band" style={{ color: selected.color }}>{selected.band.toUpperCase()} DRIVER</span>
+                            <span className="gauge-band" style={{ color: selected.color }}>{selected.band.toUpperCase()}</span>
                           </div>
                         </div>
 
                         <div className="score-breakdown-grid">
                           <div className="score-metric">
-                            <div className="metric-label">Violations (24mo)</div>
-                            <div className="metric-value amber">2</div>
-                            <div className="metric-sub">1 High · 1 Medium</div>
+                          <div className="metric-label">Violations (12mo)</div>
+                          <div className="metric-value amber">{inWindowViolations.length}</div>
+                          <div className="metric-sub">{highCount} High · {medCount} Medium · {lowCount} Low</div>
+                        </div>
+                        <div className="score-metric">
+                          <div className="metric-label">Last Violation</div>
+                          <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
+                            {lastViolation ? `${monthsAgo ?? 0} months ago` : 'No recent violations'}
                           </div>
-                          <div className="score-metric">
-                            <div className="metric-label">Last Violation</div>
-                            <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>8 months ago</div>
-                            <div className="metric-sub">Sep 2025</div>
+                          <div className="metric-sub">{lastViolation ? new Date(lastViolation.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</div>
+                        </div>
+                        <div className="score-metric">
+                          <div className="metric-label">Score Trend</div>
+                          <div className={`metric-value ${selectedRecord?.recentTrend === 'Down' ? 'red' : 'green'}`}>
+                            {selectedRecord?.recentTrend === 'Down' ? '↓' : selectedRecord?.recentTrend === 'Stable' ? '→' : '↑'} {selectedRecord?.recentTrend ?? 'Stable'}
                           </div>
-                          <div className="score-metric">
-                            <div className="metric-label">Score Trend</div>
-                            <div className="metric-value green">↑ +47</div>
-                            <div className="metric-sub">vs 6 months ago</div>
-                          </div>
-                          <div className="score-metric">
-                            <div className="metric-label">Percentile</div>
-                            <div className="metric-value green">Top 28%</div>
-                            <div className="metric-sub">of all vehicles</div>
-                          </div>
+                          <div className="metric-sub">vs 6 months ago</div>
+                        </div>
+                        <div className="score-metric">
+                          <div className="metric-label">Percentile</div>
+                          <div className="metric-value green">Top {percentile}%</div>
+                          <div className="metric-sub">of all vehicles</div>
+                        </div>
                         </div>
                       </div>
 
                       <div className="premium-box">
                         <div className="premium-label">
                           TP Premium Adjustment
-                          <strong>No Loading Applicable</strong>
+                          <strong>{adjustmentLabel}</strong>
                         </div>
                         <div style={{ display: 'flex', gap: 10 }}>
                           <div className="premium-badge">
                             <div className="badge-label">Base TP Premium</div>
-                            <div className="badge-value">₹ 2,094</div>
+                            <div className="badge-value">₹ {basePremium.toLocaleString('en-IN')}</div>
                           </div>
-                          <div className="premium-badge" style={{ borderColor: 'rgba(52,199,123,0.4)', background: 'rgba(52,199,123,0.08)' }}>
+                          <div className="premium-badge" style={{ borderColor: loadingApplicable ? 'rgba(245,115,22,0.35)' : 'rgba(52,199,123,0.4)', background: loadingApplicable ? 'rgba(245,115,22,0.08)' : 'rgba(52,199,123,0.08)' }}>
                             <div className="badge-label">DBS Adjusted Premium</div>
-                            <div className="badge-value" style={{ color: 'var(--green)' }}>₹ 2,094</div>
+                            <div className="badge-value" style={{ color: loadingApplicable ? '#f97316' : 'var(--green)' }}>₹ {adjustedPremium.toLocaleString('en-IN')}</div>
                           </div>
                         </div>
                       </div>
@@ -270,9 +328,9 @@ export default function DashboardLayout() {
                       <div className="violations-header">
                         <div>
                           <div className="title">Violation History</div>
-                          <div className="subtitle">2 violations in scoring window</div>
+                          <div className="subtitle">{inWindowViolations.length} violations in scoring window</div>
                         </div>
-                        <div className="window-badge">24-month window · Mar 2024 – Mar 2026</div>
+                        <div className="window-badge">12-month window · {formatWindowMonth(windowStart)} – {formatWindowMonth(now)}</div>
                       </div>
                       <table>
                         <thead>
@@ -281,32 +339,34 @@ export default function DashboardLayout() {
                             <th>Violation</th>
                             <th>Category</th>
                             <th>Status</th>
-                            <th>Fine</th>
+                            <th>Multiplier</th>
                             <th>Score Impact</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>18 Sep 2025</td>
-                            <td><div className="violation-type">Running Red Signal<span className="thz-tag thz-h">THZ-H</span></div></td>
-                            <td style={{ fontSize: 11, color: 'var(--red)' }}>High Hazard</td>
-                            <td><span className="status-paid">PAID</span></td>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>₹ 1,000</td>
-                            <td><span className="points-impact">–85 pts</span></td>
-                          </tr>
-                          <tr>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>02 Mar 2025</td>
-                            <td><div className="violation-type">Mobile Phone While Driving<span className="thz-tag thz-m">THZ-M</span></div></td>
-                            <td style={{ fontSize: 11, color: 'var(--amber)' }}>Medium Hazard</td>
-                            <td><span className="status-paid">PAID</span></td>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>₹ 500</td>
-                            <td><span className="points-impact low">–42 pts</span></td>
-                          </tr>
-                          <tr>
-                            <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}>
-                              <span style={{ color: 'var(--text3)' }}>3 older violations aged out of scoring window · not counted in current score</span>
-                            </td>
-                          </tr>
+                          {inWindowViolations.length === 0 && (
+                            <tr>
+                              <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}>
+                                <span style={{ color: 'var(--text3)' }}>No violations found in scoring window</span>
+                              </td>
+                            </tr>
+                          )}
+                          {inWindowViolations.map((v, idx) => {
+                            const thzClass = v.thz === 'H' ? 'thz-h' : v.thz === 'M' ? 'thz-m' : 'thz-l';
+                            const hazardLabel = v.thz === 'H' ? 'High Hazard' : v.thz === 'M' ? 'Medium Hazard' : 'Low Hazard';
+                            const hazardColor = v.thz === 'H' ? 'var(--red)' : v.thz === 'M' ? 'var(--amber)' : 'var(--accent2)';
+                            const statusClass = v.status === 'Paid' ? 'status-paid' : v.status === 'Open' ? 'status-unpaid' : 'status-court';
+                            return (
+                              <tr key={`${v.type}-${v.date}-${idx}`}>
+                                <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.date}</td>
+                                <td><div className="violation-type">{v.type}<span className={`thz-tag ${thzClass}`}>THZ-{v.thz}</span></div></td>
+                                <td style={{ fontSize: 11, color: hazardColor }}>{hazardLabel}</td>
+                                <td><span className={statusClass}>{v.status.toUpperCase()}</span></td>
+                                <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.multiplier}×</td>
+                                <td><span className={v.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>–{v.impactPoints} pts</span></td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -321,32 +381,37 @@ export default function DashboardLayout() {
               <div className="stat-card"><div className="stat-label">Total Queries (Month)</div><div className="stat-value">24,891</div><div className="stat-change up">↑ 12% vs last month</div></div>
               <div className="stat-card"><div className="stat-label">Portfolio Avg Score</div><div className="stat-value" style={{ color: 'var(--accent2)' }}>631</div><div className="stat-change up">↑ 18 pts vs 6mo ago</div></div>
               <div className="stat-card"><div className="stat-label">High Risk Vehicles</div><div className="stat-value" style={{ color: 'var(--red)' }}>8.3%</div><div className="stat-change down">↓ 1.2% improvement</div></div>
-              <div className="stat-card"><div className="stat-label">Clean Record (Excellent)</div><div className="stat-value" style={{ color: 'var(--green)' }}>41.2%</div><div className="stat-change up">↑ 3.4% this quarter</div></div>
+              <div className="stat-card"><div className="stat-label">Clean Record (Exemplary)</div><div className="stat-value" style={{ color: 'var(--green)' }}>41.2%</div><div className="stat-change up">↑ 3.4% this quarter</div></div>
             </div>
             <div className="portfolio-lower">
               <div className="band-distribution">
                 <div className="card-title">Portfolio Score Band Distribution</div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>24,891 vehicles queried this month</div>
                 <div className="band-bars">
-                  <div className="band-row"><div className="band-name">Excellent (250–300)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '41%', background: 'var(--green)' }}></div></div><div className="band-pct">41.2%</div></div>
-                  <div className="band-row"><div className="band-name">Good (200–249)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '28%', background: 'var(--accent)' }}></div></div><div className="band-pct">28.4%</div></div>
-                  <div className="band-row"><div className="band-name">Average (150–199)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '16%', background: 'var(--amber)' }}></div></div><div className="band-pct">16.1%</div></div>
-                  <div className="band-row"><div className="band-name">Poor (100–149)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '6%', background: 'var(--orange)' }}></div></div><div className="band-pct">6.0%</div></div>
-                  <div className="band-row"><div className="band-name">High Risk (0–99)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '8%', background: 'var(--red)' }}></div></div><div className="band-pct">8.3%</div></div>
+                  <div className="band-row"><div className="band-name">Exemplary (285–300)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '18%', background: '#059669' }}></div></div><div className="band-pct">18.2%</div></div>
+                  <div className="band-row"><div className="band-name">Responsible (270–284)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '12%', background: '#16a34a' }}></div></div><div className="band-pct">12.4%</div></div>
+                  <div className="band-row"><div className="band-name">Average (240–269)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '20%', background: '#22c55e' }}></div></div><div className="band-pct">20.1%</div></div>
+                  <div className="band-row"><div className="band-name">Marginal (210–239)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '11%', background: '#eab308' }}></div></div><div className="band-pct">11.0%</div></div>
+                  <div className="band-row"><div className="band-name">At Risk (180–209)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '9%', background: '#f97316' }}></div></div><div className="band-pct">9.2%</div></div>
+                  <div className="band-row"><div className="band-name">High Risk (150–179)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '8%', background: '#ef4444' }}></div></div><div className="band-pct">8.4%</div></div>
+                  <div className="band-row"><div className="band-name">Serious Risk (120–149)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '7%', background: '#dc2626' }}></div></div><div className="band-pct">7.1%</div></div>
+                  <div className="band-row"><div className="band-name">Chronic Violator (90–119)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '6%', background: '#b91c1c' }}></div></div><div className="band-pct">6.0%</div></div>
+                  <div className="band-row"><div className="band-name">Habitual Offender (60–89)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '5%', background: '#991b1b' }}></div></div><div className="band-pct">4.9%</div></div>
+                  <div className="band-row"><div className="band-name">Extreme Risk (&lt;60)</div><div className="band-bar-track"><div className="band-bar-fill" style={{ width: '4%', background: '#7f1d1d' }}></div></div><div className="band-pct">3.7%</div></div>
                 </div>
               </div>
               <div className="loss-ratio-card">
                 <div className="card-title">Loss Ratio Correlation by DBS Band</div>
                 <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 4 }}>Actuarial validation · FY 2025-26 cohort</div>
                 <div className="lr-chart">
-                  <div className="lr-row"><div className="lr-band" style={{ color: 'var(--green)' }}>Excellent</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '38%', background: 'var(--green)' }}></div></div><div className="lr-pct" style={{ color: 'var(--green)' }}>38%</div><div className="lr-count">9,124 veh</div></div>
-                  <div className="lr-row"><div className="lr-band" style={{ color: 'var(--accent2)' }}>Good</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '55%', background: 'var(--accent)' }}></div></div><div className="lr-pct" style={{ color: 'var(--accent2)' }}>55%</div><div className="lr-count">6,321 veh</div></div>
-                  <div className="lr-row"><div className="lr-band" style={{ color: 'var(--amber)' }}>Average</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '74%', background: 'var(--amber)' }}></div></div><div className="lr-pct" style={{ color: 'var(--amber)' }}>74%</div><div className="lr-count">3,574 veh</div></div>
-                  <div className="lr-row"><div className="lr-band" style={{ color: 'var(--orange)' }}>Poor</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '92%', background: 'var(--orange)' }}></div></div><div className="lr-pct" style={{ color: 'var(--orange)' }}>92%</div><div className="lr-count">1,334 veh</div></div>
-                  <div className="lr-row"><div className="lr-band" style={{ color: 'var(--red)' }}>High Risk</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '100%', background: 'linear-gradient(90deg,var(--red),#ff8080)' }}></div></div><div className="lr-pct" style={{ color: 'var(--red)' }}>118%</div><div className="lr-count">1,842 veh</div></div>
+                  <div className="lr-row"><div className="lr-band" style={{ color: '#059669' }}>Exemplary</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '34%', background: '#059669' }}></div></div><div className="lr-pct" style={{ color: '#059669' }}>34%</div><div className="lr-count">7,942 veh</div></div>
+                  <div className="lr-row"><div className="lr-band" style={{ color: '#16a34a' }}>Responsible</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '46%', background: '#16a34a' }}></div></div><div className="lr-pct" style={{ color: '#16a34a' }}>46%</div><div className="lr-count">5,601 veh</div></div>
+                  <div className="lr-row"><div className="lr-band" style={{ color: '#22c55e' }}>Average</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '61%', background: '#22c55e' }}></div></div><div className="lr-pct" style={{ color: '#22c55e' }}>61%</div><div className="lr-count">3,912 veh</div></div>
+                  <div className="lr-row"><div className="lr-band" style={{ color: '#f97316' }}>At Risk</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '86%', background: '#f97316' }}></div></div><div className="lr-pct" style={{ color: '#f97316' }}>86%</div><div className="lr-count">2,114 veh</div></div>
+                  <div className="lr-row"><div className="lr-band" style={{ color: '#7f1d1d' }}>Extreme Risk</div><div className="lr-bar-track"><div className="lr-bar-fill" style={{ width: '100%', background: 'linear-gradient(90deg,#7f1d1d,#ef4444)' }}></div></div><div className="lr-pct" style={{ color: '#7f1d1d' }}>132%</div><div className="lr-count">1,248 veh</div></div>
                 </div>
-                <div style={{ marginTop: 14, padding: 10, background: 'rgba(52,199,123,0.06)', border: '1px solid rgba(52,199,123,0.15)', borderRadius: 6, fontSize: 11, color: 'var(--text2)' }}>
-                  ✦ Excellent-band vehicles show <strong style={{ color: 'var(--green)' }}>3.1× lower loss ratio</strong> than High Risk band — actuarial significance confirmed
+                <div style={{ marginTop: 14, padding: 10, background: 'rgba(5,150,105,0.06)', border: '1px solid rgba(5,150,105,0.15)', borderRadius: 6, fontSize: 11, color: 'var(--text2)' }}>
+                  ✦ Exemplary-band vehicles show <strong style={{ color: '#059669' }}>3.2× lower loss ratio</strong> than Extreme Risk band — actuarial significance confirmed
                 </div>
               </div>
             </div>
@@ -399,9 +464,9 @@ export default function DashboardLayout() {
                 <div className="results-toolbar">
                   <div className="results-count">Showing <strong>1,428</strong> results</div>
                   <div style={{ display: 'flex', gap: 6, marginLeft: 16 }}>
-                    <span style={{ fontSize: 11, background: 'rgba(52,199,123,0.1)', border: '1px solid rgba(52,199,123,0.2)', color: 'var(--green)', padding: '3px 10px', borderRadius: 20 }}>Excellent: 589</span>
-                    <span style={{ fontSize: 11, background: 'rgba(79,142,247,0.1)', border: '1px solid rgba(79,142,247,0.2)', color: 'var(--accent2)', padding: '3px 10px', borderRadius: 20 }}>Good: 402</span>
-                    <span style={{ fontSize: 11, background: 'rgba(245,83,83,0.1)', border: '1px solid rgba(245,83,83,0.2)', color: 'var(--red)', padding: '3px 10px', borderRadius: 20 }}>High Risk: 87</span>
+                    <span style={{ fontSize: 11, background: 'rgba(5,150,105,0.1)', border: '1px solid rgba(5,150,105,0.2)', color: '#059669', padding: '3px 10px', borderRadius: 20 }}>Exemplary: 589</span>
+                    <span style={{ fontSize: 11, background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.2)', color: '#16a34a', padding: '3px 10px', borderRadius: 20 }}>Responsible: 402</span>
+                    <span style={{ fontSize: 11, background: 'rgba(127,29,29,0.1)', border: '1px solid rgba(127,29,29,0.2)', color: '#7f1d1d', padding: '3px 10px', borderRadius: 20 }}>Extreme Risk: 87</span>
                   </div>
                   <button className="export-btn">↓ Export CSV</button>
                 </div>
@@ -420,23 +485,23 @@ export default function DashboardLayout() {
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP32 AB 1234</td>
                       <td>Private Car</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--accent2)' }}>742</td>
-                      <td><span className="recent-band band-good">Good</span></td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#22c55e' }}>252</td>
+                      <td><span className="recent-band band-average">Average</span></td>
                       <td>2</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>0</td>
                     </tr>
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP14 CD 5678</td>
                       <td>Two Wheeler</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>831</td>
-                      <td><span className="recent-band band-excellent">Excellent</span></td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#059669' }}>294</td>
+                      <td><span className="recent-band band-exemplary">Exemplary</span></td>
                       <td>0</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>0</td>
                     </tr>
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP80 EF 9012</td>
                       <td>Private Car</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--red)' }}>218</td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#ef4444' }}>165</td>
                       <td><span className="recent-band band-high-risk">High Risk</span></td>
                       <td>9</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--red)' }}>+1,800</td>
@@ -444,24 +509,24 @@ export default function DashboardLayout() {
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP65 GH 3456</td>
                       <td>Goods Vehicle</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--amber)' }}>524</td>
-                      <td><span className="recent-band band-average">Average</span></td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#f97316' }}>198</td>
+                      <td><span className="recent-band band-at-risk">At Risk</span></td>
                       <td>4</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--amber)' }}>+3,200</td>
                     </tr>
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP23 IJ 7890</td>
                       <td>Private Car</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>891</td>
-                      <td><span className="recent-band band-excellent">Excellent</span></td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#16a34a' }}>276</td>
+                      <td><span className="recent-band band-responsible">Responsible</span></td>
                       <td>0</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--green)' }}>0</td>
                     </tr>
                     <tr>
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>UP41 KL 2345</td>
                       <td>Two Wheeler</td>
-                      <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--orange)' }}>347</td>
-                      <td><span className="recent-band band-poor">Poor</span></td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', color: '#b91c1c' }}>108</td>
+                      <td><span className="recent-band band-chronic-violator">Chronic Violator</span></td>
                       <td>6</td>
                       <td style={{ fontFamily: 'DM Mono, monospace', color: 'var(--orange)' }}>+380</td>
                     </tr>
