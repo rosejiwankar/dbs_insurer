@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import dbsLogo from '../assets/dbs-logo.png';
 import { useAuthStore } from '../store/authStore';
 
 type TabKey = 'lookup' | 'portfolio' | 'batch' | 'api';
@@ -45,6 +46,9 @@ export default function DashboardLayout() {
   };
 
   const displayScore = selected ? Math.round(selected.score / 3) : 0;
+  const arcLength = 267;
+  const arcProgress = Math.min(Math.max(displayScore, 0), 300) / 300;
+  const arcOffset = arcLength * (1 - arcProgress);
 
   const logout = () => {
     clearAuth();
@@ -54,9 +58,12 @@ export default function DashboardLayout() {
   return (
     <>
       <aside className="sidebar">
-        <div className="sidebar-logo">
-          <div className="logo-mark">DBS<span>.</span></div>
-          <div className="logo-sub">Driver Behaviour Score</div>
+        <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src={dbsLogo} alt="DBS logo" style={{ width: 60, height: 60, objectFit: 'contain' }} />
+          <div className="logo-sub">
+            <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Driver Behaviour</span>
+            <span style={{ display: 'block', whiteSpace: 'nowrap' }}>Score</span>
+          </div>
         </div>
 
         <div className="insurer-badge">
@@ -175,22 +182,36 @@ export default function DashboardLayout() {
                           <svg viewBox="0 0 200 110">
                             <defs>
                               <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#f55353" stopOpacity="0.35" />
-                                <stop offset="35%" stopColor="#f57c00" stopOpacity="0.35" />
-                                <stop offset="65%" stopColor="#f5a623" stopOpacity="0.35" />
-                                <stop offset="85%" stopColor="#4f8ef7" stopOpacity="0.35" />
-                                <stop offset="100%" stopColor="#34c77b" stopOpacity="0.35" />
+                                <stop offset="0%" stopColor="#ff4444" stopOpacity="0.35" />
+                                <stop offset="59.7%" stopColor="#ff4444" stopOpacity="0.35" />
+                                <stop offset="69.7%" stopColor="#f97316" stopOpacity="0.35" />
+                                <stop offset="79.7%" stopColor="#eab308" stopOpacity="0.35" />
+                                <stop offset="89.7%" stopColor="#22c55e" stopOpacity="0.35" />
+                                <stop offset="96.3%" stopColor="#16a34a" stopOpacity="0.35" />
+                                <stop offset="100%" stopColor="#059669" stopOpacity="0.35" />
                               </linearGradient>
                               <linearGradient id="arcGradActive" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stopColor="#f55353" />
-                                <stop offset="35%" stopColor="#f57c00" />
-                                <stop offset="65%" stopColor="#f5a623" />
-                                <stop offset="85%" stopColor="#4f8ef7" />
-                                <stop offset="100%" stopColor="#34c77b" />
+                                <stop offset="0%" stopColor="#ff4444" />
+                                <stop offset="59.7%" stopColor="#ff4444" />
+                                <stop offset="69.7%" stopColor="#f97316" />
+                                <stop offset="79.7%" stopColor="#eab308" />
+                                <stop offset="89.7%" stopColor="#22c55e" />
+                                <stop offset="96.3%" stopColor="#16a34a" />
+                                <stop offset="100%" stopColor="#059669" />
                               </linearGradient>
                             </defs>
                             <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="url(#arcGrad)" strokeWidth="12" strokeLinecap="round" />
-                            <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="url(#arcGradActive)" strokeWidth="12" strokeLinecap="round" strokeDasharray="267" strokeDashoffset="69" id="gauge-arc" />
+                            <path
+                              d="M 15 100 A 85 85 0 0 1 185 100"
+                              fill="none"
+                              stroke="url(#arcGradActive)"
+                              strokeWidth="12"
+                              strokeLinecap="round"
+                              strokeDasharray={arcLength}
+                              strokeDashoffset={arcOffset}
+                              style={{ transition: 'stroke-dashoffset 1.2s ease' }}
+                              id="gauge-arc"
+                            />
                             <g id="needle-group" transform={`rotate(${selected.needle} 100 100)`}>
                               <line x1="100" y1="100" x2="100" y2="28" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                               <circle cx="100" cy="100" r="5" fill="white" />
