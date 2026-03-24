@@ -86,9 +86,7 @@ export default function DashboardLayout() {
   const highCount = inWindowViolations.filter((v) => v.thz === 'H').length;
   const medCount = inWindowViolations.filter((v) => v.thz === 'M').length;
   const lowCount = inWindowViolations.filter((v) => v.thz === 'L').length;
-  const totalVehicles = Object.keys(sampleScores).length;
-  const higherScores = Object.values(sampleScores).filter((v) => v.score > (selected?.score ?? 0)).length;
-  const percentile = totalVehicles ? Math.round(((totalVehicles - higherScores) / totalVehicles) * 100) : 0;
+  const openChallans = inWindowViolations.filter((v) => v.status === 'Open').length;
   const basePremium = 2094;
   const selectedBandKey = selected ? bandKeyFromLabel(selected.band) : undefined;
   const adjustment = selectedBandKey ? premiumAdjustmentPercent(selectedBandKey) : 0;
@@ -298,11 +296,11 @@ export default function DashboardLayout() {
                           </div>
                           <div className="metric-sub">vs 6 months ago</div>
                         </div>
-                        <div className="score-metric">
-                          <div className="metric-label">Percentile</div>
-                          <div className="metric-value green">Top {percentile}%</div>
-                          <div className="metric-sub">of all vehicles</div>
-                        </div>
+	                        <div className="score-metric">
+	                          <div className="metric-label">Open Challans</div>
+	                          <div className={`metric-value ${openChallans > 0 ? 'red' : 'green'}`}>{openChallans}</div>
+	                          <div className="metric-sub">within the 12-month scoring window</div>
+	                        </div>
                         </div>
                       </div>
 
