@@ -1,54 +1,53 @@
-import { useAPIStatus } from '../hooks/useAPIStatus';
-import { useAPILogs } from '../hooks/useAPILogs';
-
 export default function APIConsole() {
-  const status = useAPIStatus();
-  const logs = useAPILogs();
-
   return (
-    <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-slate-900">API Console</h1>
+    <div className="api-layout">
+      <div>
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-title">API Credentials</div>
+          <div style={{ marginBottom: 12 }}>
+            <div className="field-label">Live API Key</div>
+            <div className="api-key-box">
+              <div className="api-key-value">dbs_live_baj••••••••••••••••••••••••••••xyz9</div>
+              <button className="copy-btn">Copy</button>
+            </div>
+          </div>
+          <div>
+            <div className="field-label">Sandbox API Key</div>
+            <div className="api-key-box">
+              <div className="api-key-value">dbs_test_baj••••••••••••••••••••••••••••abc1</div>
+              <button className="copy-btn">Copy</button>
+            </div>
+          </div>
+          <div style={{ marginTop: 14, padding: 12, background: 'var(--surface2)', borderRadius: 8, fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text2)', lineHeight: 1.8 }}>
+            <span style={{ color: 'var(--text3)' }}>POST</span> https://api.dbs.sii.in/v1/score<br />
+            <span style={{ color: 'var(--text3)' }}>Header:</span> Authorization: Bearer dbs_live_baj••••••••••••••••••••••••••••xyz9<br />
+            <span style={{ color: 'var(--text3)' }}>Body:</span> {'{'} "reg_no": "UP32AB1234" {'}'}
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-xs text-slate-500">Uptime</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-900">{status.data?.uptime ?? '--'}%</div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-xs text-slate-500">Avg Latency</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-900">{status.data?.avgResponseMs ?? '--'} ms</div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-xs text-slate-500">Calls Today</div>
-          <div className="mt-1 text-2xl font-semibold text-slate-900">{status.data?.callsToday ?? '--'}</div>
+        <div className="card">
+          <div className="card-title">SLA Metrics (Live)</div>
+          <div className="sla-grid">
+            <div className="sla-item"><div className="sla-value">99.98%</div><div className="sla-label">Uptime (30d)</div></div>
+            <div className="sla-item"><div className="sla-value">124ms</div><div className="sla-label">Avg Response</div></div>
+            <div className="sla-item"><div className="sla-value">847</div><div className="sla-label">Calls Today</div></div>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700">Recent API Logs</h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Time</th>
-                <th className="px-3 py-2">Req</th>
-                <th className="px-3 py-2">Endpoint</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Latency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.data?.map((entry: any, idx: number) => (
-                <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-3 py-2">{entry.timestamp}</td>
-                  <td className="px-3 py-2">{entry.regNo}</td>
-                  <td className="px-3 py-2">{entry.endpoint}</td>
-                  <td className="px-3 py-2">{entry.status}</td>
-                  <td className="px-3 py-2">{entry.responseMs} ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="card">
+        <div className="card-title">Recent API Calls</div>
+        <div className="log-list">
+          <div className="log-item" style={{ background: 'var(--surface3)', fontSize: 10, fontWeight: 500 }}>
+            <span>TIME</span><span>REG NO.</span><span>ENDPOINT</span><span>RESP (ms)</span><span>STATUS</span>
+          </div>
+          <div className="log-item"><span className="log-time">11:48:32</span><span className="log-reg">UP32AB****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">112ms</span><span className="log-status log-200">200</span></div>
+          <div className="log-item"><span className="log-time">11:48:11</span><span className="log-reg">MH04CD****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">98ms</span><span className="log-status log-200">200</span></div>
+          <div className="log-item"><span className="log-time">11:47:59</span><span className="log-reg">DL8CAF****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">134ms</span><span className="log-status log-200">200</span></div>
+          <div className="log-item"><span className="log-time">11:47:45</span><span className="log-reg">KA01MN****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">—</span><span className="log-status log-404">404</span></div>
+          <div className="log-item"><span className="log-time">11:47:30</span><span className="log-reg">TN09GH****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">141ms</span><span className="log-status log-200">200</span></div>
+          <div className="log-item"><span className="log-time">11:47:18</span><span className="log-reg">UP80EF****</span><span className="log-endpoint">/v1/batch</span><span className="log-ms">2.1s</span><span className="log-status log-200">200</span></div>
+          <div className="log-item"><span className="log-time">11:46:55</span><span className="log-reg">GJ05AB****</span><span className="log-endpoint">/v1/score</span><span className="log-ms">119ms</span><span className="log-status log-200">200</span></div>
         </div>
       </div>
     </div>

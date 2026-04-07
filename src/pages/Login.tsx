@@ -1,34 +1,33 @@
 import { ChangeEvent, FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-
-const dummyUser = { name: 'Amit Sharma', insurer: 'Pragati Insurance' };
+import { login as loginRequest } from '../services/authService';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const setAuth = useAuthStore((state: { setAuth: (token: string, user: { name: string; insurer: string }) => void }) => state.setAuth);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
-    if (!email || !password) {
+    if (!username || !password) {
       setError('Enter credentials');
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
-    if (password !== 'password123') {
-      setError('Invalid credentials (use password123)');
+    try {
+      const session = await loginRequest({ username: username.trim(), password });
+      setAuth(session.token, session.user, session.refreshToken);
+      navigate('/lookup');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in');
+    } finally {
       setLoading(false);
-      return;
     }
-    setAuth('mock-token', dummyUser);
-    setLoading(false);
-    navigate('/lookup');
   }
 
   return (
@@ -39,11 +38,11 @@ export default function Login() {
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Email</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Username</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
               required
               className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
@@ -70,8 +69,6 @@ export default function Login() {
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-slate-500">Use password <strong className="text-slate-700">password123</strong></p>
       </div>
     </div>
   );

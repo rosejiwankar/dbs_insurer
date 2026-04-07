@@ -29,4 +29,11 @@ export interface ScoreResult {
   challanStatus: string;
   tpLoading: number;
   violations: Violation[];
+  basePremium?: number;
+  adjustedPremium?: number;
+  fuelType?: string;
+  stateName?: string;
+  cc?: number;
+  queriedAt?: string;
+  freshAsOf?: string;
 }
