@@ -1,59 +1,95 @@
-import { ScoreResult } from '../types/score';
-import { sampleVehicleScores } from './mockData';
-import { calculateScoreFromViolations } from '../utils/dbsScoring';
+import { useAuthStore } from '../store/authStore';
+import { refreshAccessToken } from './authService';
 
-export interface BatchRow {
-  reg_no: string;
-  policy_id?: string;
-  vehicle_type?: string;
+const DEFAULT_API_BASE_URL = 'https://driver-behavior-score.onrender.com';
+const apiBaseUrl = (import.meta.env.VITE_DBS_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+
+export interface BatchLookupResult {
+  vehicle_number: string;
+  category: string;
+  category_description: string;
+  score: number;
+  risk_level: string;
+  premium_modifier_pct: number;
+  total_violations: number;
 }
 
-export interface BatchResult {
-  id: string;
-  rows: Array<{ reg_no: string; score: number | null; band: string; tpLoading: number }>; 
-  status: 'queued' | 'processing' | 'complete' | 'failed';
+export interface BatchLookupResponse {
+  results: BatchLookupResult[];
+  total_results: number;
+  risk_category_counts: Record<string, number>;
 }
 
-const batchStore: Record<string, BatchResult> = {};
-
-export async function submitBatch(rows: BatchRow[]): Promise<{ batchId: string }> {
-  const batchId = `BATCH-${Date.now()}`;
-  batchStore[batchId] = {
-    id: batchId,
-    status: 'queued',
-    rows: rows.map((r) => {
-      const entry = sampleVehicleScores[r.reg_no.toUpperCase().replace(/\s+/g, '')];
-      const computed = entry ? calculateScoreFromViolations(entry.violations) : null;
-      return {
-        reg_no: r.reg_no,
-        score: computed?.score ?? null,
-        band: computed?.band ?? 'NOT_FOUND',
-        tpLoading: entry?.tpLoading ?? 0
-      };
+async function requestBatchLookup(accessToken: string, vehicleNumbers: string[]) {
+  return fetch(`${apiBaseUrl}/dashboard/lookup/batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    },
+    body: JSON.stringify({
+      vehicle_numbers: vehicleNumbers
     })
-  };
-  setTimeout(() => {
-    const current = batchStore[batchId];
-    if (current) {
-      current.status = 'processing';
-      setTimeout(() => {
-        current.status = 'complete';
-      }, 1200);
+  });
+}
+
+export async function submitBatch(vehicleNumbers: string[]): Promise<BatchLookupResponse> {
+  const authState = useAuthStore.getState();
+  let token = authState.token;
+
+  if (!token) {
+    throw new Error('Missing auth token');
+  }
+
+  let response = await requestBatchLookup(token, vehicleNumbers);
+
+  if (response.status === 401 && authState.refreshToken) {
+    try {
+      const refreshed = await refreshAccessToken(authState.refreshToken);
+      useAuthStore.getState().setAuth(
+        refreshed.token,
+        refreshed.user.email || refreshed.user.name
+          ? {
+              ...authState.user,
+              ...refreshed.user
+            }
+          : (authState.user ?? refreshed.user),
+        refreshed.refreshToken ?? authState.refreshToken
+      );
+      token = refreshed.token;
+      response = await requestBatchLookup(token, vehicleNumbers);
+    } catch {
+      useAuthStore.getState().clearAuth();
+      throw new Error('Session expired. Please sign in again.');
     }
-  }, 500);
-  return { batchId };
-}
+  }
 
-export async function getBatchStatus(batchId: string): Promise<{ status: BatchResult['status']; processed: number; total: number }> {
-  const batch = batchStore[batchId];
-  if (!batch) throw new Error('batch_not_found');
-  const total = batch.rows.length;
-  const processed = batch.status === 'complete' ? total : Math.floor(total * (batch.status === 'processing' ? 0.6 : 0.1));
-  return { status: batch.status, processed, total };
-}
+  const data = (await response.json().catch(() => null)) as
+    | BatchLookupResponse
+    | { detail?: string; message?: string }
+    | null;
 
-export async function getBatchResults(batchId: string): Promise<BatchResult> {
-  const batch = batchStore[batchId];
-  if (!batch) throw new Error('batch_not_found');
-  return batch;
+  if (!response.ok) {
+    const message =
+      (data && 'detail' in data && typeof data.detail === 'string' && data.detail) ||
+      (data && 'message' in data && typeof data.message === 'string' && data.message) ||
+      'Batch lookup failed';
+    throw new Error(message);
+  }
+
+  if (
+    !data ||
+    !('results' in data) ||
+    !Array.isArray(data.results) ||
+    !('total_results' in data) ||
+    typeof data.total_results !== 'number' ||
+    !('risk_category_counts' in data) ||
+    typeof data.risk_category_counts !== 'object'
+  ) {
+    throw new Error('Batch lookup response is invalid');
+  }
+
+  console.log('Batch lookup API response:', data);
+
+  return data;
 }

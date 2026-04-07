@@ -49,14 +49,14 @@ export default function DashboardLayout() {
           <NavLink to="/batch" className={navItemClass}>
             <svg className="icon" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6M9 12h6M9 15h4" /></svg>
             Batch Processing
-            <span className="nav-badge">3</span>
+            {/* <span className="nav-badge">3</span> */}
           </NavLink>
 
-          <div className="nav-section">Analytics</div>
+          {/* <div className="nav-section">Analytics</div>
           <NavLink to="/portfolio" className={navItemClass}>
             <svg className="icon" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
             Portfolio Analytics
-          </NavLink>
+          </NavLink> */}
 
           <div className="nav-section">Developer</div>
           <NavLink to="/api" className={navItemClass}>
@@ -79,11 +79,11 @@ export default function DashboardLayout() {
       <main className="main">
         <header className="topbar">
           <span className="page-title">{activePage}</span>
-          <div className="topbar-right">
+          {/* <div className="topbar-right">
             <div className="topbar-stat">Today's queries: <strong>847</strong></div>
             <div className="topbar-stat">Avg response: <strong>124ms</strong></div>
             <div className="topbar-stat" style={{ color: 'var(--green)' }}>API <strong style={{ color: 'var(--green)' }}>99.98%</strong> uptime</div>
-          </div>
+          </div> */}
         </header>
 
         <div className="content">
