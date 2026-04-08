@@ -6,7 +6,7 @@ import { bandFromScore } from '../utils/bandFromScore';
 
 type ParsedCsvRow = Record<string, string>;
 
-const MAX_BATCH_SIZE = 10000;
+const MAX_BATCH_SIZE = 50;
 
 function normalizeVehicleNumber(value: string) {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -197,7 +197,7 @@ export default function BatchProcessing() {
           >
             <div className="upload-icon">CSV</div>
             <div className="upload-text">Drop CSV file here or click to browse</div>
-            <div className="upload-sub">Max 10,000 vehicle numbers per batch</div>
+            <div className="upload-sub">Max 50 vehicle numbers per batch</div>
             <span
               onClick={(event) => {
                 event.preventDefault();

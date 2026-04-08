@@ -4,7 +4,6 @@ import { premiumAdjustmentPercent, scoreViolations } from '../utils/dbsScoring';
 import { ScoreBand, ScoreResult } from '../types/score';
 import { scoreColor } from '../utils/scoreColor';
 
-const quickSamples = ['MH31AB1234', 'UP32CD5678', 'DL8CAF9012', 'KA01MN3456', 'TN09GH1122'];
 const RECENT_QUERIES_STORAGE_KEY = 'dbs_recent_vehicle_queries';
 const RECENT_QUERIES_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -32,7 +31,7 @@ export default function VehicleLookup() {
     setQueryReg(formattedReg);
   };
 
-  const onSample = (reg: string) => {
+  const onRecentQuery = (reg: string) => {
     setRegInput(reg.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1$2 $3 $4'));
     setQueryReg(reg);
   };
@@ -156,17 +155,15 @@ export default function VehicleLookup() {
             <div className="card-title" style={{ marginBottom: 10 }}>Recent Queries</div>
             {recentQueries.length ? (
               recentQueries.map((item) => (
-                <div key={item.regNo} className="recent-item" onClick={() => onSample(item.regNo)}>
+                <div key={item.regNo} className="recent-item" onClick={() => onRecentQuery(item.regNo)}>
                   <span className="recent-reg">{item.regNo.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1 $2 $3 $4')}</span>
                   <span className={bandClass(item.band)}>{item.band}</span>
                 </div>
               ))
             ) : (
-              quickSamples.map((reg) => (
-                <div key={reg} className="recent-item" onClick={() => onSample(reg)}>
-                  <span className="recent-reg">{reg.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1 $2 $3 $4')}</span>
-                </div>
-              ))
+              <div className="api-key-empty" style={{ marginTop: 0 }}>
+                No recent queries yet. Use the input above to look up a vehicle.
+              </div>
             )}
           </div>
         </div>

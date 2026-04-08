@@ -52,6 +52,7 @@ function formatDate(value: string | null) {
 
 function ApiKeyRow({
   item,
+  status,
   isEditing,
   editName,
   onEditNameChange,
@@ -63,6 +64,7 @@ function ApiKeyRow({
   deletePending,
 }: {
   item: ApiKeyItem;
+  status: 'active' | 'inactive' | 'revoked';
   isEditing: boolean;
   editName: string;
   onEditNameChange: (value: string) => void;
@@ -73,77 +75,64 @@ function ApiKeyRow({
   renamePending: boolean;
   deletePending: boolean;
 }) {
+  const isReadOnly = status !== 'active';
+
   return (
     <div className="api-key-row">
-      <div>
-        <div className="field-label">Name</div>
-        {isEditing ? (
-          <input
-            value={editName}
-            onChange={(event) => onEditNameChange(event.target.value)}
-            className="api-key-input"
-            placeholder="Key name"
-          />
-        ) : (
-          <div className="api-key-meta-value">{item.name}</div>
-        )}
-      </div>
-      <div>
-        <div className="field-label">Prefix</div>
-        <div className="api-key-meta-value">{item.key_prefix}</div>
-      </div>
-      <div>
-        <div className="field-label">Created</div>
-        <div className="api-key-meta-value">{formatDate(item.created_at)}</div>
-      </div>
-      <div>
-        <div className="field-label">Last Used</div>
-        <div className="api-key-meta-value">
-          {formatDate(item.last_used_at)}
+      <div className="api-key-row-top">
+        <div className="api-key-row-main">
+          <div className="api-key-row-title-wrap">
+            {isEditing ? (
+              <input
+                value={editName}
+                onChange={(event) => onEditNameChange(event.target.value)}
+                className="api-key-input api-key-edit-input"
+                placeholder="Key name"
+              />
+            ) : (
+              <div className="api-key-row-title">{item.name}</div>
+            )}
+            <div className={status === 'active' ? 'api-key-status-badge' : 'api-key-status-badge muted'}>
+              {status === 'active' ? 'Active' : status === 'revoked' ? 'Revoked' : 'Inactive'}
+            </div>
+          </div>
+          <div className="api-key-row-prefix">{item.key_prefix}</div>
+        </div>
+        <div className="api-key-actions">
+          {isReadOnly ? (
+            <span className="api-key-row-note">
+              {status === 'revoked' ? 'This key has been revoked.' : 'This key is inactive.'}
+            </span>
+          ) : isEditing ? (
+            <>
+              <button className="api-action-btn primary" onClick={onSaveRename} disabled={renamePending || !editName.trim()}>
+                {renamePending ? 'Saving...' : 'Save'}
+              </button>
+              <button className="api-action-btn" onClick={onCancelRename} disabled={renamePending}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="api-action-btn" onClick={() => onStartRename(item)} disabled={deletePending}>
+                Rename
+              </button>
+              <button className="api-action-btn danger" onClick={() => onRevoke(item)} disabled={deletePending}>
+                {deletePending ? 'Revoking...' : 'Revoke'}
+              </button>
+            </>
+          )}
         </div>
       </div>
-      <div>
-        <div className="field-label">Status</div>
-        <div className={item.is_active ? "status-ok" : "status-muted"}>
-          {item.is_active ? "Active" : "Inactive"}
+      <div className="api-key-row-meta">
+        <div className="api-key-meta-chip">
+          <span className="api-key-meta-label">Created</span>
+          <span className="api-key-meta-value">{formatDate(item.created_at)}</span>
         </div>
-      </div>
-      <div className="api-key-actions">
-        {isEditing ? (
-          <>
-            <button
-              className="copy-btn"
-              onClick={onSaveRename}
-              disabled={renamePending}
-            >
-              {renamePending ? "Saving..." : "Save"}
-            </button>
-            <button
-              className="copy-btn"
-              onClick={onCancelRename}
-              disabled={renamePending}
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              className="copy-btn"
-              onClick={() => onStartRename(item)}
-              disabled={deletePending}
-            >
-              Rename
-            </button>
-            <button
-              className="copy-btn api-key-danger"
-              onClick={() => onRevoke(item)}
-              disabled={deletePending}
-            >
-              {deletePending ? "Revoking..." : "Revoke"}
-            </button>
-          </>
-        )}
+        <div className="api-key-meta-chip">
+          <span className="api-key-meta-label">Last Used</span>
+          <span className="api-key-meta-value">{formatDate(item.last_used_at)}</span>
+        </div>
       </div>
     </div>
   );
@@ -162,11 +151,17 @@ export default function APIConsole() {
   const [copiedValue, setCopiedValue] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [revokedKeys, setRevokedKeys] = useState<ApiKeyItem[]>([]);
 
   const activeKeyCount = useMemo(
     () => apiKeys.filter((key) => key.is_active).length,
     [apiKeys],
   );
+
+  const visibleKeys = useMemo(() => {
+    const apiKeyIds = new Set(apiKeys.map((key) => key.id));
+    return [...apiKeys, ...revokedKeys.filter((key) => !apiKeyIds.has(key.id))];
+  }, [apiKeys, revokedKeys]);
 
   async function copyText(value: string) {
     try {
@@ -208,6 +203,17 @@ export default function APIConsole() {
     if (!confirmed) return;
 
     await deleteMutation.mutateAsync(item.id);
+    setRevokedKeys((current) => {
+      if (current.some((key) => key.id === item.id)) return current;
+      return [
+        ...current,
+        {
+          ...item,
+          is_active: false,
+          last_used_at: item.last_used_at,
+        },
+      ];
+    });
     if (editingId === item.id) {
       setEditingId(null);
       setEditingName("");
@@ -255,7 +261,7 @@ export default function APIConsole() {
             <span style={{ color: "var(--text3)" }}>Base URL</span>{" "}
             https://driver-behavior-score.onrender.com
             <br />
-            <span style={{ color: "var(--text3)" }}>Use the keys below</span> to
+            <span style={{ color: "var(--text3)" }}>Use the API keys</span> to
             authenticate these public endpoints.
           </div>
         </div>
@@ -270,7 +276,7 @@ export default function APIConsole() {
             placeholder="Give this key a name"
           />
           <button
-            className="btn-primary"
+            className="api-action-btn primary api-create-btn"
             onClick={handleCreateKey}
             disabled={createMutation.isPending || !newKeyName.trim()}
           >
@@ -288,7 +294,7 @@ export default function APIConsole() {
             <div className="api-key-box">
               <div className="api-key-value">{createdKey.raw_key}</div>
               <button
-                className="copy-btn"
+                className="api-action-btn"
                 onClick={() => copyText(createdKey.raw_key)}
               >
                 {copiedValue === createdKey.raw_key ? "Copied" : "Copy"}
@@ -321,14 +327,22 @@ export default function APIConsole() {
             <div className="api-key-empty">No API keys created yet.</div>
           ) : null}
           {!isLoading && !error
-            ? apiKeys.map((item) => (
+            ? visibleKeys.map((item) => (
                 <ApiKeyRow
                   key={item.id}
                   item={item}
-                  isEditing={editingId === item.id}
+                  status={
+                    revokedKeys.some((key) => key.id === item.id)
+                      ? 'revoked'
+                      : item.is_active
+                        ? 'active'
+                        : 'inactive'
+                  }
+                  isEditing={editingId === item.id && item.is_active && !revokedKeys.some((key) => key.id === item.id)}
                   editName={editingId === item.id ? editingName : item.name}
                   onEditNameChange={setEditingName}
                   onStartRename={(keyItem) => {
+                    if (!keyItem.is_active || revokedKeys.some((key) => key.id === keyItem.id)) return;
                     setEditingId(keyItem.id);
                     setEditingName(keyItem.name);
                   }}
@@ -351,30 +365,6 @@ export default function APIConsole() {
             {renameMutation.error?.message || deleteMutation.error?.message}
           </div>
         ) : null}
-        <div
-          style={{
-            marginTop: 14,
-            padding: 12,
-            background: "var(--surface2)",
-            borderRadius: 8,
-            fontFamily: "DM Mono, monospace",
-            fontSize: 11,
-            color: "var(--text2)",
-            lineHeight: 1.8,
-          }}
-        >
-          <span style={{ color: "var(--text3)" }}>GET</span> /auth/api-keys
-          <br />
-          <span style={{ color: "var(--text3)" }}>
-            POST
-          </span> /auth/api-keys {"{"} "name": "Insurer Portal" {"}"}
-          <br />
-          <span style={{ color: "var(--text3)" }}>PATCH</span> /auth/api-keys/
-          {"{"}key_id{"}"} {"{"} "name": "Renamed Key" {"}"}
-          <br />
-          <span style={{ color: "var(--text3)" }}>DELETE</span> /auth/api-keys/
-          {"{"}key_id{"}"}
-        </div>
       </div>
 
       {/* <div className="card">
