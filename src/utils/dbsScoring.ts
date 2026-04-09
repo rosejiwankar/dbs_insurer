@@ -56,8 +56,9 @@ export function scoreViolations(violations: Violation[], windowMonths = 12, now 
   const grouped: Record<string, Violation[]> = {};
   inWindow.forEach((v) => {
     const rule = classifyOffence(v.type);
-    grouped[rule.code] = grouped[rule.code] || [];
-    grouped[rule.code].push(v);
+    const groupingCode = v.categoryCode || rule.code;
+    grouped[groupingCode] = grouped[groupingCode] || [];
+    grouped[groupingCode].push(v);
   });
 
   const scored: ScoredViolation[] = [];
@@ -67,8 +68,9 @@ export function scoreViolations(violations: Violation[], windowMonths = 12, now 
       const rule = classifyOffence(v.type);
       const instance = idx + 1;
       const multiplier = repeatMultiplier(instance);
-      const impactPoints = rule.points * multiplier;
-      scored.push({ ...v, code, basePoints: rule.points, instance, multiplier, impactPoints });
+      const basePoints = v.categoryDeduction ?? rule.points;
+      const impactPoints = basePoints * multiplier;
+      scored.push({ ...v, code: v.categoryCode || code, basePoints, instance, multiplier, impactPoints });
     });
   });
 

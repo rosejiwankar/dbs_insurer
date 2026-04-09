@@ -48,8 +48,7 @@ export default function VehicleLookup() {
   const now = new Date();
   const windowStart = new Date(now);
   windowStart.setMonth(windowStart.getMonth() - 12);
-  const scoredViolations = scoreViolations(selectedViolations, 12, now);
-  const inWindowViolations = scoredViolations;
+  const inWindowViolations = scoreViolations(selectedViolations, 12, now);
   const lastViolation = inWindowViolations[0];
   const monthsAgo = lastViolation
     ? Math.max(0, Math.round((now.getTime() - new Date(lastViolation.date).getTime()) / (1000 * 60 * 60 * 24 * 30)))
@@ -64,10 +63,36 @@ export default function VehicleLookup() {
   const tpLoading = selected?.tpLoading ?? Math.round((basePremium * adjustment) / 100);
   const adjustedPremium = selected?.adjustedPremium ?? basePremium + tpLoading;
   const loadingApplicable = tpLoading > 0;
-  const adjustmentLabel = adjustment < 0 ? 'Discount Applied' : adjustment > 0 ? 'Loading Applicable' : 'No Loading Applicable';
-  const formatWindowMonth = (d: Date) => d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+  const adjustmentLabel =
+    adjustment < 0 ? 'Discount Applied' : adjustment > 0 ? 'Loading Applicable' : 'No Loading Applicable';
+  const premiumDeltaLabel = loadingApplicable ? 'Loading' : tpLoading < 0 ? 'Discount' : 'Adjustment';
+  const premiumDeltaValue = Math.abs(tpLoading);
+  const premiumDeltaPrefix = loadingApplicable ? '+' : tpLoading < 0 ? '-' : '';
+  const premiumEquationOperator = loadingApplicable ? '+' : tpLoading < 0 ? '-' : '+';
+  const ownerName = selected?.ownerName || 'Owner information unavailable';
+  const vehicleSpec = selected?.cc ? `${selected.cc}cc` : 'CC unavailable';
+  const premiumAccentStyles = loadingApplicable
+    ? {
+        borderColor: 'rgba(220,38,38,0.35)',
+        background: 'rgba(220,38,38,0.08)',
+        color: '#991b1b'
+      }
+    : {
+        borderColor: 'rgba(52,199,123,0.4)',
+        background: 'rgba(52,199,123,0.08)',
+        color: 'var(--green)'
+      };
+  const formatWindowMonth = (date: Date) => date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
   const formatDateTime = (value?: string) =>
-    value ? new Date(value).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+    value
+      ? new Date(value).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : 'N/A';
   const formatDate = (value?: string) =>
     value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
   const gaugeColor = selected ? scoreColor(selected.band) : '#16a34a';
@@ -146,13 +171,18 @@ export default function VehicleLookup() {
               />
             </div>
             <button className="lookup-btn" onClick={onQuery}>
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
               Query DBS Score
             </button>
           </div>
 
           <div className="recent-queries">
-            <div className="card-title" style={{ marginBottom: 10 }}>Recent Queries</div>
+            <div className="card-title" style={{ marginBottom: 10 }}>
+              Recent Queries
+            </div>
             {recentQueries.length ? (
               recentQueries.map((item) => (
                 <div key={item.regNo} className="recent-item" onClick={() => onRecentQuery(item.regNo)}>
@@ -171,21 +201,34 @@ export default function VehicleLookup() {
 
       <div className="result-panel" id="result-panel">
         {!queryReg && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }} id="empty-state">
+          <div
+            id="empty-state"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }}
+          >
             <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>??</div>
-            <div className="hint-text" style={{ padding: 0 }}>Enter a vehicle registration number to query the Driver Behaviour Score</div>
+            <div className="hint-text" style={{ padding: 0 }}>
+              Enter a vehicle registration number to query the Driver Behaviour Score
+            </div>
           </div>
         )}
 
         {queryReg && result.isLoading && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }}>
-            <div className="hint-text" style={{ padding: 0 }}>Loading vehicle score...</div>
+          <div
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }}
+          >
+            <div className="hint-text" style={{ padding: 0 }}>
+              Loading vehicle score...
+            </div>
           </div>
         )}
 
         {queryReg && result.isError && !result.isLoading && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }}>
-            <div className="hint-text" style={{ padding: 0, color: '#dc2626' }}>{result.error?.message || 'Vehicle not found or lookup failed'}</div>
+          <div
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 48, textAlign: 'center' }}
+          >
+            <div className="hint-text" style={{ padding: 0, color: '#dc2626' }}>
+              {result.error?.message || 'Vehicle not found or lookup failed'}
+            </div>
           </div>
         )}
 
@@ -202,7 +245,8 @@ export default function VehicleLookup() {
                   </div>
                 </div>
                 <div className="query-time">
-                  Queried: {formatDateTime(selected.queriedAt)}<br />
+                  Queried: {formatDateTime(selected.queriedAt)}
+                  <br />
                   <span style={{ color: 'var(--green)' }}>Data fresh as of: {formatDate(selected.freshAsOf)}</span>
                 </div>
               </div>
@@ -236,8 +280,24 @@ export default function VehicleLookup() {
                         <stop offset="100%" stopColor="#059669" stopOpacity="0.9" />
                       </linearGradient>
                     </defs>
-                    <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="url(#arcGrad)" strokeWidth="12" strokeLinecap="round" />
-                    <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke={activeGaugeStroke} strokeWidth="12" strokeLinecap="round" strokeDasharray={arcLength} strokeDashoffset={animatedArcOffset} style={{ transition: 'stroke-dashoffset 1.2s ease' }} id="gauge-arc" />
+                    <path
+                      d="M 15 100 A 85 85 0 0 1 185 100"
+                      fill="none"
+                      stroke="url(#arcGrad)"
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      id="gauge-arc"
+                      d="M 15 100 A 85 85 0 0 1 185 100"
+                      fill="none"
+                      stroke={activeGaugeStroke}
+                      strokeWidth="12"
+                      strokeLinecap="round"
+                      strokeDasharray={arcLength}
+                      strokeDashoffset={animatedArcOffset}
+                      style={{ transition: 'stroke-dashoffset 1.2s ease' }}
+                    />
                     <g id="needle-group" transform={`rotate(${needleRotation} 100 100)`}>
                       <line x1="100" y1="100" x2="100" y2="28" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                       <circle cx="100" cy="100" r="5" fill="white" />
@@ -245,35 +305,150 @@ export default function VehicleLookup() {
                     </g>
                   </svg>
                   <div className="gauge-score-label">
-                    <span className="gauge-number" style={{ color: gaugeColor }}>{displayScore}</span>
-                    <span className="gauge-band" style={{ color: gaugeColor }}>{selected.band.toUpperCase()}</span>
+                    <span className="gauge-number" style={{ color: gaugeColor }}>
+                      {displayScore}
+                    </span>
+                    <span className="gauge-band" style={{ color: gaugeColor }}>
+                      {selected.band.toUpperCase()}
+                    </span>
                   </div>
                 </div>
 
                 <div className="score-breakdown-grid">
-                  <div className="score-metric"><div className="metric-label">Violations (12mo)</div><div className="metric-value amber">{inWindowViolations.length}</div><div className="metric-sub">{highCount} High · {medCount} Medium · {lowCount} Low</div></div>
-                  <div className="score-metric"><div className="metric-label">Last Violation</div><div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>{lastViolation ? `${monthsAgo ?? 0} months ago` : 'No recent violations'}</div><div className="metric-sub">{lastViolation ? new Date(lastViolation.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}</div></div>
-                  <div className="score-metric"><div className="metric-label">Score Trend</div><div className={`metric-value ${selected.recentTrend === 'Down' ? 'red' : 'green'}`}>{selected.recentTrend}</div><div className="metric-sub">vs 6 months ago</div></div>
-                  <div className="score-metric"><div className="metric-label">Percentile</div><div className="metric-value green">Top {percentile}%</div><div className="metric-sub">of all vehicles</div></div>
+                  <div className="score-metric">
+                    <div className="metric-label">Owner Name</div>
+                    <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
+                      {ownerName}
+                    </div>
+                    <div className="metric-sub">{selected.stateName || 'Unknown State'}</div>
+                  </div>
+                  <div className="score-metric">
+                    <div className="metric-label">Vehicle Details</div>
+                    <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
+                      {selected.vehicleType || 'Vehicle'}
+                    </div>
+                    <div className="metric-sub">{vehicleSpec}</div>
+                  </div>
+                  <div className="score-metric">
+                    <div className={`metric-value ${selected.recentTrend === 'Down' ? 'red' : 'green'}`}>
+                      {selected.recentTrend}
+                    </div>
+                    <div className="metric-label">Score Trend</div>
+                    <div className="metric-sub">vs 6 months ago</div>
+                  </div>
+                  <div className="score-metric">
+                    <div className="metric-label">Percentile</div>
+                    <div className="metric-value green">Top {percentile}%</div>
+                    <div className="metric-sub">of all vehicles</div>
+                  </div>
                 </div>
               </div>
 
               <div className="premium-box">
-                <div className="premium-label">TP Premium Adjustment<strong>{adjustmentLabel}</strong></div>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div className="premium-badge"><div className="badge-label">Base TP Premium</div><div className="badge-value">₹ {basePremium.toLocaleString('en-IN')}</div></div>
-                  <div className="premium-badge" style={{ borderColor: loadingApplicable ? 'rgba(245,115,22,0.35)' : 'rgba(52,199,123,0.4)', background: loadingApplicable ? 'rgba(245,115,22,0.08)' : 'rgba(52,199,123,0.08)' }}><div className="badge-label">DBS Adjusted Premium</div><div className="badge-value" style={{ color: loadingApplicable ? '#f97316' : 'var(--green)' }}>₹ {adjustedPremium.toLocaleString('en-IN')}</div></div>
+                <div className="premium-label">
+                  TP Premium Adjustment
+                  <strong style={{ color: loadingApplicable ? '#991b1b' : undefined }}>{adjustmentLabel}</strong>
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <div className="premium-badge">
+                    <div className="badge-label">Base TP Premium</div>
+                    <div className="badge-value">INR {basePremium.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text2)' }}>{premiumEquationOperator}</div>
+                  <div
+                    className="premium-badge"
+                    style={{ borderColor: premiumAccentStyles.borderColor, background: premiumAccentStyles.background }}
+                  >
+                    <div className="badge-label">{premiumDeltaLabel}</div>
+                    <div className="badge-value" style={{ color: premiumAccentStyles.color }}>
+                      {premiumDeltaPrefix}INR {premiumDeltaValue.toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text2)' }}>=</div>
+                  <div
+                    className="premium-badge"
+                    style={{ borderColor: premiumAccentStyles.borderColor, background: premiumAccentStyles.background }}
+                  >
+                    <div className="badge-label">DBS Adjusted Premium</div>
+                    <div className="badge-value" style={{ color: premiumAccentStyles.color }}>
+                      INR {adjustedPremium.toLocaleString('en-IN')}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="violations-card">
-              <div className="violations-header"><div><div className="title">Violation History</div><div className="subtitle">{inWindowViolations.length} violations in scoring window</div></div><div className="window-badge">12-month window · {formatWindowMonth(windowStart)} – {formatWindowMonth(now)}</div></div>
+              <div className="violations-header">
+                <div>
+                  <div className="title">Violation History</div>
+                  <div className="subtitle">{inWindowViolations.length} violations in scoring window</div>
+                </div>
+                <div className="window-badge">
+                  12-month window - {formatWindowMonth(windowStart)} to {formatWindowMonth(now)}
+                </div>
+              </div>
+              <div className="score-breakdown-grid" style={{ margin: '0 20px 18px' }}>
+                <div className="score-metric">
+                  <div className="metric-label">Violations (12mo)</div>
+                  <div className="metric-value amber">{inWindowViolations.length}</div>
+                  <div className="metric-sub">
+                    {highCount} High / {medCount} Medium / {lowCount} Low
+                  </div>
+                </div>
+                <div className="score-metric">
+                  <div className="metric-label">Last Violation</div>
+                  <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
+                    {lastViolation ? `${monthsAgo ?? 0} months ago` : 'No recent violations'}
+                  </div>
+                  <div className="metric-sub">
+                    {lastViolation
+                      ? new Date(lastViolation.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                      : 'N/A'}
+                  </div>
+                </div>
+              </div>
               <table>
-                <thead><tr><th>Date</th><th>Violation</th><th>Category</th><th>Status</th><th>Multiplier</th><th>Score Impact</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Challan Details</th>
+                    <th>Category</th>
+                    <th>Category Deduction</th>
+                    <th>Repeat Multiplier</th>
+                    <th>Final Points</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {inWindowViolations.length === 0 && (<tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}><span style={{ color: 'var(--text3)' }}>No violations found in scoring window</span></td></tr>)}
-                  {inWindowViolations.map((v, idx) => { const statusClass = v.status === 'Paid' ? 'status-paid' : v.status === 'Open' ? 'status-unpaid' : 'status-court'; return (<tr key={`${v.type}-${v.date}-${idx}`}><td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{new Date(v.date).toLocaleDateString('en-IN')}</td><td><div className="violation-type">{v.type}<span className="thz-tag">{v.code}</span></div></td><td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.code}</td><td><span className={statusClass}>{v.status.toUpperCase()}</span></td><td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{v.multiplier}×</td><td><span className={v.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>–{v.impactPoints} pts</span></td></tr>); })}
+                  {inWindowViolations.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}>
+                        <span style={{ color: 'var(--text3)' }}>No violations found in scoring window</span>
+                      </td>
+                    </tr>
+                  )}
+                  {inWindowViolations.map((violation, idx) => {
+                    const categoryLabel = [violation.categoryName, violation.categoryDescription].filter(Boolean).join(' - ');
+
+                    return (
+                      <tr key={`${violation.type}-${violation.date}-${idx}`}>
+                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>
+                          {new Date(violation.date).toLocaleDateString('en-IN')}
+                        </td>
+                        <td>
+                          <div className="violation-type">{violation.challanDetails || violation.type}</div>
+                        </td>
+                        <td style={{ fontSize: 11 }}>{categoryLabel || violation.code}</td>
+                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>-{violation.basePoints} pts</td>
+                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{violation.multiplier}x</td>
+                        <td>
+                          <span className={violation.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>
+                            -{violation.impactPoints} pts
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

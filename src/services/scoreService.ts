@@ -7,11 +7,18 @@ const DEFAULT_API_BASE_URL = 'https://driver-behavior-score.onrender.com';
 const apiBaseUrl = (import.meta.env.VITE_DBS_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 
 interface LookupViolationResponse {
+  challan_details?: string;
   offense_details: string;
   challan_date: string;
+  challan_place?: string;
   fine_amount: number;
   paid_status: boolean;
   severity: string;
+  thz_category?: {
+    name?: string;
+    description?: string;
+    deduction?: number;
+  };
 }
 
 interface LookupResponse {
@@ -39,6 +46,7 @@ interface LookupResponse {
     state_name: string;
     fuel_type: string;
     cc: number;
+    owner_name?: string;
   };
   fresh_as_of: string;
   queried_at: string;
@@ -143,15 +151,21 @@ export async function fetchScore(regNo: string): Promise<ScoreResult> {
   const violations = (data.violations ?? []).map((violation) => ({
     type: violation.offense_details || 'Traffic violation',
     date: violation.challan_date,
-    location: data.vehicle.state_name || data.vehicle.state_code || 'Unknown',
+    location: violation.challan_place || data.vehicle.state_name || data.vehicle.state_code || 'Unknown',
     thz: mapSeverityToThz(violation.severity || ''),
     status: mapViolationStatus(Boolean(violation.paid_status)),
-    impact: violation.fine_amount ?? 0
+    impact: violation.fine_amount ?? 0,
+    challanDetails: violation.challan_details || violation.offense_details || 'N/A',
+    categoryCode: violation.thz_category?.name,
+    categoryName: violation.thz_category?.name,
+    categoryDescription: violation.thz_category?.description,
+    categoryDeduction: violation.thz_category?.deduction
   }));
 
   return {
     regNo: data.vehicle.vehicle_number || data.dbs.dbs_stats.vehicle_number || norm,
     vehicleType: buildVehicleType(data.vehicle),
+    ownerName: data.vehicle.owner_name,
     score,
     band,
     severityIndex: data.dbs.dbs_stats.total_deductions ?? 0,

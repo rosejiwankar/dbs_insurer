@@ -17,11 +17,17 @@ export interface Violation {
   thz: 'H' | 'M' | 'L';
   status: 'Open' | 'Paid' | 'Disputed';
   impact: number;
+  challanDetails?: string;
+  categoryCode?: string;
+  categoryName?: string;
+  categoryDescription?: string;
+  categoryDeduction?: number;
 }
 
 export interface ScoreResult {
   regNo: string;
   vehicleType: string;
+  ownerName?: string;
   score: number;
   band: ScoreBand;
   severityIndex: number;
