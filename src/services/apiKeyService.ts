@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore';
-import { refreshAccessToken } from './authService';
+import { ensureValidAccessToken } from './authService';
 
 const DEFAULT_API_BASE_URL = 'https://driver-behavior-score.onrender.com';
 const apiBaseUrl = (import.meta.env.VITE_DBS_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
@@ -24,29 +24,13 @@ type ApiErrorResponse = {
 };
 
 async function withAuthorizedRequest(execute: (token: string) => Promise<Response>) {
-  const authState = useAuthStore.getState();
-  let token = authState.token;
-
-  if (!token) {
-    throw new Error('Missing auth token');
-  }
+  let token = await ensureValidAccessToken();
 
   let response = await execute(token);
 
-  if (response.status === 401 && authState.refreshToken) {
+  if (response.status === 401) {
     try {
-      const refreshed = await refreshAccessToken(authState.refreshToken);
-      useAuthStore.getState().setAuth(
-        refreshed.token,
-        refreshed.user.email || refreshed.user.name
-          ? {
-              ...authState.user,
-              ...refreshed.user
-            }
-          : (authState.user ?? refreshed.user),
-        refreshed.refreshToken ?? authState.refreshToken
-      );
-      token = refreshed.token;
+      token = await ensureValidAccessToken(true);
       response = await execute(token);
     } catch {
       useAuthStore.getState().clearAuth();

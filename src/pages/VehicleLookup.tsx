@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useScoreLookup } from '../hooks/useScoreLookup';
-import { premiumAdjustmentPercent, scoreViolations } from '../utils/dbsScoring';
+import { scoreViolations } from '../utils/dbsScoring';
 import { ScoreBand, ScoreResult } from '../types/score';
 import { scoreColor } from '../utils/scoreColor';
 
@@ -56,32 +56,8 @@ export default function VehicleLookup() {
   const highCount = inWindowViolations.filter((v) => v.thz === 'H').length;
   const medCount = inWindowViolations.filter((v) => v.thz === 'M').length;
   const lowCount = inWindowViolations.filter((v) => v.thz === 'L').length;
-  const percentile = selected ? Math.max(1, Math.min(99, Math.round((selected.score / 300) * 100))) : 0;
-  const basePremium = selected?.basePremium ?? 2094;
-  const selectedBandKey = selected ? bandKeyFromLabel(selected.band) : undefined;
-  const adjustment = selectedBandKey ? premiumAdjustmentPercent(selectedBandKey) : 0;
-  const tpLoading = selected?.tpLoading ?? Math.round((basePremium * adjustment) / 100);
-  const adjustedPremium = selected?.adjustedPremium ?? basePremium + tpLoading;
-  const loadingApplicable = tpLoading > 0;
-  const adjustmentLabel =
-    adjustment < 0 ? 'Discount Applied' : adjustment > 0 ? 'Loading Applicable' : 'No Loading Applicable';
-  const premiumDeltaLabel = loadingApplicable ? 'Loading' : tpLoading < 0 ? 'Discount' : 'Adjustment';
-  const premiumDeltaValue = Math.abs(tpLoading);
-  const premiumDeltaPrefix = loadingApplicable ? '+' : tpLoading < 0 ? '-' : '';
-  const premiumEquationOperator = loadingApplicable ? '+' : tpLoading < 0 ? '-' : '+';
   const ownerName = selected?.ownerName || 'Owner information unavailable';
   const vehicleSpec = selected?.cc ? `${selected.cc}cc` : 'CC unavailable';
-  const premiumAccentStyles = loadingApplicable
-    ? {
-        borderColor: 'rgba(220,38,38,0.35)',
-        background: 'rgba(220,38,38,0.08)',
-        color: '#991b1b'
-      }
-    : {
-        borderColor: 'rgba(52,199,123,0.4)',
-        background: 'rgba(52,199,123,0.08)',
-        color: 'var(--green)'
-      };
   const formatWindowMonth = (date: Date) => date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
   const formatDateTime = (value?: string) =>
     value
@@ -157,10 +133,16 @@ export default function VehicleLookup() {
 
   return (
     <div className="lookup-layout">
-      <div>
-        <div className="card">
+      <div className="lookup-sidebar-panel">
+        <div className="card lookup-sidebar-card">
           <div className="card-title">Vehicle Registration Lookup</div>
-          <div className="lookup-input-group">
+          <form
+            className="lookup-input-group"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onQuery();
+            }}
+          >
             <div>
               <div className="field-label">Registration Number</div>
               <input
@@ -170,31 +152,33 @@ export default function VehicleLookup() {
                 onChange={(e) => setRegInput(e.target.value.toUpperCase())}
               />
             </div>
-            <button className="lookup-btn" onClick={onQuery}>
+            <button type="submit" className="lookup-btn">
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
               Query DBS Score
             </button>
-          </div>
+          </form>
 
           <div className="recent-queries">
             <div className="card-title" style={{ marginBottom: 10 }}>
               Recent Queries
             </div>
-            {recentQueries.length ? (
-              recentQueries.map((item) => (
-                <div key={item.regNo} className="recent-item" onClick={() => onRecentQuery(item.regNo)}>
-                  <span className="recent-reg">{item.regNo.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1 $2 $3 $4')}</span>
-                  <span className={bandClass(item.band)}>{item.band}</span>
+            <div className="recent-queries-scroll">
+              {recentQueries.length ? (
+                recentQueries.map((item) => (
+                  <div key={item.regNo} className="recent-item" onClick={() => onRecentQuery(item.regNo)}>
+                    <span className="recent-reg">{item.regNo.replace(/(\w{2})(\d{2})(\w{2})(\d+)/, '$1 $2 $3 $4')}</span>
+                    <span className={bandClass(item.band)}>{item.band}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="api-key-empty" style={{ marginTop: 0 }}>
+                  No recent queries yet. Use the input above to look up a vehicle.
                 </div>
-              ))
-            ) : (
-              <div className="api-key-empty" style={{ marginTop: 0 }}>
-                No recent queries yet. Use the input above to look up a vehicle.
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -238,11 +222,6 @@ export default function VehicleLookup() {
               <div className="vehicle-header">
                 <div>
                   <div className="vehicle-reg">{selected.regNo || formattedReg || 'UP32 AB 1234'}</div>
-                  <div className="vehicle-meta">
-                    <span>{selected.vehicleType || 'Vehicle'}</span>
-                    <span>{selected.stateName || 'Unknown State'}</span>
-                    <span>{selected.fuelType || 'Unknown Fuel'}</span>
-                  </div>
                 </div>
                 <div className="query-time">
                   Queried: {formatDateTime(selected.queriedAt)}
@@ -314,147 +293,105 @@ export default function VehicleLookup() {
                   </div>
                 </div>
 
-                <div className="score-breakdown-grid">
+                <div className="score-breakdown-grid" style={{ gridTemplateColumns: '1fr' }}>
                   <div className="score-metric">
                     <div className="metric-label">Owner Name</div>
-                    <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
-                      {ownerName}
-                    </div>
+                    <div className="metric-value" style={{ fontSize: 16, marginTop: 3 }}>{ownerName}</div>
                     <div className="metric-sub">{selected.stateName || 'Unknown State'}</div>
                   </div>
                   <div className="score-metric">
                     <div className="metric-label">Vehicle Details</div>
-                    <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
+                    <div className="metric-value" style={{ fontSize: 16, marginTop: 3 }}>
                       {selected.vehicleType || 'Vehicle'}
                     </div>
-                    <div className="metric-sub">{vehicleSpec}</div>
-                  </div>
-                  <div className="score-metric">
-                    <div className={`metric-value ${selected.recentTrend === 'Down' ? 'red' : 'green'}`}>
-                      {selected.recentTrend}
-                    </div>
-                    <div className="metric-label">Score Trend</div>
-                    <div className="metric-sub">vs 6 months ago</div>
-                  </div>
-                  <div className="score-metric">
-                    <div className="metric-label">Percentile</div>
-                    <div className="metric-value green">Top {percentile}%</div>
-                    <div className="metric-sub">of all vehicles</div>
                   </div>
                 </div>
               </div>
-
-              <div className="premium-box">
-                <div className="premium-label">
-                  TP Premium Adjustment
-                  <strong style={{ color: loadingApplicable ? '#991b1b' : undefined }}>{adjustmentLabel}</strong>
-                </div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <div className="premium-badge">
-                    <div className="badge-label">Base TP Premium</div>
-                    <div className="badge-value">INR {basePremium.toLocaleString('en-IN')}</div>
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text2)' }}>{premiumEquationOperator}</div>
-                  <div
-                    className="premium-badge"
-                    style={{ borderColor: premiumAccentStyles.borderColor, background: premiumAccentStyles.background }}
-                  >
-                    <div className="badge-label">{premiumDeltaLabel}</div>
-                    <div className="badge-value" style={{ color: premiumAccentStyles.color }}>
-                      {premiumDeltaPrefix}INR {premiumDeltaValue.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text2)' }}>=</div>
-                  <div
-                    className="premium-badge"
-                    style={{ borderColor: premiumAccentStyles.borderColor, background: premiumAccentStyles.background }}
-                  >
-                    <div className="badge-label">DBS Adjusted Premium</div>
-                    <div className="badge-value" style={{ color: premiumAccentStyles.color }}>
-                      INR {adjustedPremium.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="violations-card">
-              <div className="violations-header">
-                <div>
-                  <div className="title">Violation History</div>
-                  <div className="subtitle">{inWindowViolations.length} violations in scoring window</div>
-                </div>
-                <div className="window-badge">
-                  12-month window - {formatWindowMonth(windowStart)} to {formatWindowMonth(now)}
-                </div>
-              </div>
-              <div className="score-breakdown-grid" style={{ margin: '0 20px 18px' }}>
-                <div className="score-metric">
-                  <div className="metric-label">Violations (12mo)</div>
-                  <div className="metric-value amber">{inWindowViolations.length}</div>
-                  <div className="metric-sub">
-                    {highCount} High / {medCount} Medium / {lowCount} Low
-                  </div>
-                </div>
-                <div className="score-metric">
-                  <div className="metric-label">Last Violation</div>
-                  <div className="metric-value" style={{ fontSize: 14, marginTop: 3 }}>
-                    {lastViolation ? `${monthsAgo ?? 0} months ago` : 'No recent violations'}
-                  </div>
-                  <div className="metric-sub">
-                    {lastViolation
-                      ? new Date(lastViolation.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                      : 'N/A'}
-                  </div>
-                </div>
-              </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Challan Details</th>
-                    <th>Category</th>
-                    <th>Category Deduction</th>
-                    <th>Repeat Multiplier</th>
-                    <th>Final Points</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inWindowViolations.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}>
-                        <span style={{ color: 'var(--text3)' }}>No violations found in scoring window</span>
-                      </td>
-                    </tr>
-                  )}
-                  {inWindowViolations.map((violation, idx) => {
-                    const categoryLabel = [violation.categoryName, violation.categoryDescription].filter(Boolean).join(' - ');
-
-                    return (
-                      <tr key={`${violation.type}-${violation.date}-${idx}`}>
-                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>
-                          {new Date(violation.date).toLocaleDateString('en-IN')}
-                        </td>
-                        <td>
-                          <div className="violation-type">{violation.challanDetails || violation.type}</div>
-                        </td>
-                        <td style={{ fontSize: 11 }}>{categoryLabel || violation.code}</td>
-                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>-{violation.basePoints} pts</td>
-                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{violation.multiplier}x</td>
-                        <td>
-                          <span className={violation.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>
-                            -{violation.impactPoints} pts
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
       </div>
+
+      {selected && !result.isLoading && (
+        <div className="lookup-full-width">
+          <div className="violations-card">
+            <div className="violations-header">
+              <div>
+                <div className="title">Violation History</div>
+                <div className="subtitle">{inWindowViolations.length} violations in scoring window</div>
+              </div>
+              <div className="window-badge">
+                12-month window - {formatWindowMonth(windowStart)} to {formatWindowMonth(now)}
+              </div>
+            </div>
+            <div className="score-breakdown-grid" style={{ margin: '0 20px 18px' }}>
+              <div className="score-metric">
+                <div className="metric-label">Violations (12mo)</div>
+                <div className="metric-value amber">{inWindowViolations.length}</div>
+                <div className="metric-sub">
+                  {highCount} High / {medCount} Medium / {lowCount} Low
+                </div>
+              </div>
+              <div className="score-metric">
+                <div className="metric-label">Last Violation</div>
+                <div className="metric-value" style={{ fontSize: 16, marginTop: 3 }}>
+                  {lastViolation ? `${monthsAgo ?? 0} months ago` : 'No recent violations'}
+                </div>
+                <div className="metric-sub">
+                  {lastViolation
+                    ? new Date(lastViolation.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                    : 'N/A'}
+                </div>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Challan Details</th>
+                  <th>Offense Details</th>
+                  <th>Category</th>
+                  <th>Category Deduction</th>
+                  <th>Repeat Multiplier</th>
+                  <th>Final Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inWindowViolations.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 11, padding: '12px 20px' }}>
+                      <span style={{ color: 'var(--text3)' }}>No violations found in scoring window</span>
+                    </td>
+                  </tr>
+                )}
+                {inWindowViolations.map((violation, idx) => {
+                  const categoryLabel = [violation.categoryName, violation.categoryDescription].filter(Boolean).join(' - ');
+
+                  return (
+                    <tr key={`${violation.type}-${violation.date}-${idx}`}>
+                      <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>
+                        {new Date(violation.date).toLocaleDateString('en-IN')}
+                      </td>
+                      <td>
+                        <div className="violation-type">{violation.challanDetails || violation.type}</div>
+                      </td>
+                      <td style={{ fontSize: 11 }}>{violation.type}</td>
+                      <td style={{ fontSize: 11 }}>{categoryLabel || violation.code}</td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>-{violation.basePoints} pts</td>
+                      <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{violation.multiplier}x</td>
+                      <td>
+                        <span className={violation.impactPoints >= 40 ? 'points-impact' : 'points-impact low'}>
+                          -{violation.impactPoints} pts
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

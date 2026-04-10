@@ -299,13 +299,25 @@ samp {
   display: grid;
   grid-template-columns: 380px 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+}
+.lookup-sidebar-panel {
+  height: 100%;
+}
+.lookup-full-width {
+  grid-column: 1 / -1;
 }
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+}
+.lookup-sidebar-card {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .card-title {
   font-size: 11px;
@@ -372,6 +384,27 @@ samp {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.recent-queries-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.recent-queries-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.recent-queries-scroll::-webkit-scrollbar-thumb {
+  background: rgba(154, 165, 184, 0.6);
+  border-radius: 999px;
+}
+.recent-queries-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 .recent-item {
   display: flex;
@@ -442,22 +475,28 @@ samp {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 .score-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
+  height: 100%;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .vehicle-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 .vehicle-reg {
   font-family: "DM Mono", monospace;
-  font-size: 22px;
+  font-size: 26px;
   color: var(--text);
   letter-spacing: 0.08em;
 }
@@ -476,24 +515,25 @@ samp {
 }
 .query-time {
   font-family: "DM Mono", monospace;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text2);
   text-align: right;
+  line-height: 1.5;
 }
 .score-gauge-area {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 32px;
+  grid-template-columns: 228px 1fr;
+  gap: 36px;
   align-items: center;
 }
 .gauge-container {
   position: relative;
-  width: 200px;
-  height: 110px;
+  width: 228px;
+  height: 125px;
 }
 .gauge-container svg {
-  width: 200px;
-  height: 110px;
+  width: 228px;
+  height: 125px;
 }
 .gauge-score-label {
   position: absolute;
@@ -504,7 +544,7 @@ samp {
 }
 .gauge-number {
   font-family: var(--font-sans);
-  font-size: 38px;
+  font-size: 44px;
   font-weight: 700;
   color: var(--green);
   line-height: 1;
@@ -528,18 +568,18 @@ samp {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 .score-metric .metric-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text3);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   font-family: "DM Mono", monospace;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .score-metric .metric-value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--text);
   font-family: var(--font-sans);
@@ -555,9 +595,9 @@ samp {
   color: var(--red);
 }
 .score-metric .metric-sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text2);
-  margin-top: 1px;
+  margin-top: 3px;
 }
 .premium-box {
   background: linear-gradient(
@@ -618,14 +658,14 @@ samp {
   justify-content: space-between;
 }
 .violations-header .title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
 }
 .violations-header .subtitle {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text2);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 .window-badge {
   font-family: "DM Mono", monospace;
@@ -641,16 +681,16 @@ table {
   border-collapse: collapse;
 }
 thead th {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text3);
   font-family: "DM Mono", monospace;
-  padding: 10px 20px;
+  padding: 12px 20px;
   text-align: left;
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
-  font-weight: 500;
+  font-weight: 600;
 }
 tbody tr {
   border-bottom: 1px solid var(--border);
@@ -663,14 +703,14 @@ tbody tr:hover {
   background: var(--surface2);
 }
 tbody td {
-  padding: 11px 20px;
-  font-size: 12px;
+  padding: 13px 20px;
+  font-size: 13px;
   color: var(--text2);
 }
 .violation-type {
   color: var(--text);
   font-weight: 500;
-  font-size: 12px;
+  font-size: 13px;
 }
 .thz-tag {
   font-family: "DM Mono", monospace;

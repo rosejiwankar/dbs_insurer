@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore';
-import { refreshAccessToken } from './authService';
+import { ensureValidAccessToken } from './authService';
 import { ScoreBand, ScoreResult, Violation } from '../types/score';
 import { bandFromScore } from '../utils/bandFromScore';
 
@@ -89,12 +89,7 @@ function buildVehicleType(vehicle: LookupResponse['vehicle']): string {
 
 export async function fetchScore(regNo: string): Promise<ScoreResult> {
   const norm = regNo.toUpperCase().replace(/\s+/g, '');
-  const authState = useAuthStore.getState();
-  let token = authState.token;
-
-  if (!token) {
-    throw new Error('Missing auth token');
-  }
+  let token = await ensureValidAccessToken();
 
   const requestLookup = async (accessToken: string) =>
     fetch(`${apiBaseUrl}/dashboard/lookup/${encodeURIComponent(norm)}`, {
@@ -106,20 +101,9 @@ export async function fetchScore(regNo: string): Promise<ScoreResult> {
 
   let response = await requestLookup(token);
 
-  if (response.status === 401 && authState.refreshToken) {
+  if (response.status === 401) {
     try {
-      const refreshed = await refreshAccessToken(authState.refreshToken);
-      useAuthStore.getState().setAuth(
-        refreshed.token,
-        refreshed.user.email || refreshed.user.name
-          ? {
-              ...authState.user,
-              ...refreshed.user
-            }
-          : (authState.user ?? refreshed.user),
-        refreshed.refreshToken ?? authState.refreshToken
-      );
-      token = refreshed.token;
+      token = await ensureValidAccessToken(true);
       response = await requestLookup(token);
     } catch {
       useAuthStore.getState().clearAuth();

@@ -21,7 +21,13 @@ export default function Login() {
     setLoading(true);
     try {
       const session = await loginRequest({ username: username.trim(), password });
-      setAuth(session.token, session.user, session.refreshToken);
+      setAuth(
+        session.token,
+        session.user,
+        session.refreshToken,
+        session.accessTokenExpiresAt,
+        session.refreshTokenExpiresAt
+      );
       navigate('/lookup');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in');

@@ -9,57 +9,110 @@ export interface AuthUser {
 interface AuthState {
   token: string | null;
   refreshToken: string | null;
+  accessTokenExpiresAt: number | null;
+  refreshTokenExpiresAt: number | null;
   user: AuthUser | null;
   isAuthenticated: boolean;
-  setAuth: (token: string, user: AuthUser, refreshToken?: string | null) => void;
-  updateTokens: (token: string, refreshToken?: string | null) => void;
+  setAuth: (
+    token: string,
+    user: AuthUser,
+    refreshToken?: string | null,
+    accessTokenExpiresAt?: number | null,
+    refreshTokenExpiresAt?: number | null
+  ) => void;
+  updateTokens: (
+    token: string,
+    refreshToken?: string | null,
+    accessTokenExpiresAt?: number | null,
+    refreshTokenExpiresAt?: number | null
+  ) => void;
   clearAuth: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   refreshToken: null,
+  accessTokenExpiresAt: null,
+  refreshTokenExpiresAt: null,
   user: null,
   isAuthenticated: false,
-  setAuth: (token, user, refreshToken = null) => {
+  setAuth: (token, user, refreshToken = null, accessTokenExpiresAt = null, refreshTokenExpiresAt = null) => {
     localStorage.setItem('dbs_token', token);
     if (refreshToken) {
       localStorage.setItem('dbs_refresh_token', refreshToken);
     } else {
       localStorage.removeItem('dbs_refresh_token');
     }
+    if (typeof accessTokenExpiresAt === 'number') {
+      localStorage.setItem('dbs_access_token_expires_at', String(accessTokenExpiresAt));
+    } else {
+      localStorage.removeItem('dbs_access_token_expires_at');
+    }
+    if (typeof refreshTokenExpiresAt === 'number') {
+      localStorage.setItem('dbs_refresh_token_expires_at', String(refreshTokenExpiresAt));
+    } else {
+      localStorage.removeItem('dbs_refresh_token_expires_at');
+    }
     localStorage.setItem('dbs_user', JSON.stringify(user));
-    set({ token, refreshToken, user, isAuthenticated: true });
+    set({ token, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, user, isAuthenticated: true });
   },
-  updateTokens: (token, refreshToken) => {
+  updateTokens: (token, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt) => {
     localStorage.setItem('dbs_token', token);
     if (typeof refreshToken === 'string' && refreshToken) {
       localStorage.setItem('dbs_refresh_token', refreshToken);
     }
+    if (typeof accessTokenExpiresAt === 'number') {
+      localStorage.setItem('dbs_access_token_expires_at', String(accessTokenExpiresAt));
+    }
+    if (typeof refreshTokenExpiresAt === 'number') {
+      localStorage.setItem('dbs_refresh_token_expires_at', String(refreshTokenExpiresAt));
+    }
     set((state) => ({
       token,
       refreshToken: typeof refreshToken === 'string' && refreshToken ? refreshToken : state.refreshToken,
+      accessTokenExpiresAt: typeof accessTokenExpiresAt === 'number' ? accessTokenExpiresAt : state.accessTokenExpiresAt,
+      refreshTokenExpiresAt: typeof refreshTokenExpiresAt === 'number' ? refreshTokenExpiresAt : state.refreshTokenExpiresAt,
       isAuthenticated: true
     }));
   },
   clearAuth: () => {
     localStorage.removeItem('dbs_token');
     localStorage.removeItem('dbs_refresh_token');
+    localStorage.removeItem('dbs_access_token_expires_at');
+    localStorage.removeItem('dbs_refresh_token_expires_at');
     localStorage.removeItem('dbs_user');
-    set({ token: null, refreshToken: null, user: null, isAuthenticated: false });
+    set({ token: null, refreshToken: null, accessTokenExpiresAt: null, refreshTokenExpiresAt: null, user: null, isAuthenticated: false });
   }
 }));
 
 export function hydrateAuth() {
   const token = localStorage.getItem('dbs_token');
   const refreshToken = localStorage.getItem('dbs_refresh_token');
+  const accessTokenExpiresAtRaw = localStorage.getItem('dbs_access_token_expires_at');
+  const refreshTokenExpiresAtRaw = localStorage.getItem('dbs_refresh_token_expires_at');
   const userJson = localStorage.getItem('dbs_user');
   if (token && userJson) {
     try {
       const user = JSON.parse(userJson);
-      useAuthStore.setState({ token, refreshToken, user, isAuthenticated: true });
+      const accessTokenExpiresAt = accessTokenExpiresAtRaw ? Number(accessTokenExpiresAtRaw) : null;
+      const refreshTokenExpiresAt = refreshTokenExpiresAtRaw ? Number(refreshTokenExpiresAtRaw) : null;
+      useAuthStore.setState({
+        token,
+        refreshToken,
+        accessTokenExpiresAt: Number.isFinite(accessTokenExpiresAt) ? accessTokenExpiresAt : null,
+        refreshTokenExpiresAt: Number.isFinite(refreshTokenExpiresAt) ? refreshTokenExpiresAt : null,
+        user,
+        isAuthenticated: true
+      });
     } catch {
-      useAuthStore.setState({ token: null, refreshToken: null, user: null, isAuthenticated: false });
+      useAuthStore.setState({
+        token: null,
+        refreshToken: null,
+        accessTokenExpiresAt: null,
+        refreshTokenExpiresAt: null,
+        user: null,
+        isAuthenticated: false
+      });
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useAuthStore } from '../store/authStore';
-import { refreshAccessToken } from './authService';
+import { ensureValidAccessToken } from './authService';
 
 const DEFAULT_API_BASE_URL = 'https://driver-behavior-score.onrender.com';
 const apiBaseUrl = (import.meta.env.VITE_DBS_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
@@ -34,29 +34,13 @@ async function requestBatchLookup(accessToken: string, vehicleNumbers: string[])
 }
 
 export async function submitBatch(vehicleNumbers: string[]): Promise<BatchLookupResponse> {
-  const authState = useAuthStore.getState();
-  let token = authState.token;
-
-  if (!token) {
-    throw new Error('Missing auth token');
-  }
+  let token = await ensureValidAccessToken();
 
   let response = await requestBatchLookup(token, vehicleNumbers);
 
-  if (response.status === 401 && authState.refreshToken) {
+  if (response.status === 401) {
     try {
-      const refreshed = await refreshAccessToken(authState.refreshToken);
-      useAuthStore.getState().setAuth(
-        refreshed.token,
-        refreshed.user.email || refreshed.user.name
-          ? {
-              ...authState.user,
-              ...refreshed.user
-            }
-          : (authState.user ?? refreshed.user),
-        refreshed.refreshToken ?? authState.refreshToken
-      );
-      token = refreshed.token;
+      token = await ensureValidAccessToken(true);
       response = await requestBatchLookup(token, vehicleNumbers);
     } catch {
       useAuthStore.getState().clearAuth();

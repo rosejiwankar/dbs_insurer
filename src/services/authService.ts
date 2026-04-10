@@ -1,4 +1,4 @@
-import { AuthUser } from '../store/authStore';
+import { AuthUser, useAuthStore } from '../store/authStore';
 
 const DEFAULT_API_BASE_URL = 'https://driver-behavior-score.onrender.com';
 const apiBaseUrl = (import.meta.env.VITE_DBS_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
@@ -21,7 +21,17 @@ export interface LoginPayload {
 export interface AuthSession {
   token: string;
   refreshToken: string | null;
+  accessTokenExpiresAt: number | null;
+  refreshTokenExpiresAt: number | null;
   user: AuthUser;
+}
+
+const ACCESS_TOKEN_REFRESH_BUFFER_MS = 60 * 1000;
+
+let refreshInFlight: Promise<AuthSession> | null = null;
+
+function toExpiryTimestamp(expiresInSeconds?: number): number | null {
+  return typeof expiresInSeconds === 'number' && expiresInSeconds > 0 ? Date.now() + expiresInSeconds * 1000 : null;
 }
 
 function toAuthSession(
@@ -35,6 +45,8 @@ function toAuthSession(
   return {
     token: data.access_token,
     refreshToken: 'refresh_token' in data && typeof data.refresh_token === 'string' ? data.refresh_token : null,
+    accessTokenExpiresAt: 'access_expires_in' in data ? toExpiryTimestamp(data.access_expires_in) : null,
+    refreshTokenExpiresAt: 'refresh_expires_in' in data ? toExpiryTimestamp(data.refresh_expires_in) : null,
     user: {
       name: 'name' in data && typeof data.name === 'string' ? data.name : fallbackUsername || 'User',
       email: 'email' in data && typeof data.email === 'string' ? data.email : fallbackUsername
@@ -84,4 +96,69 @@ export async function refreshAccessToken(refreshToken: string): Promise<AuthSess
   }
 
   return toAuthSession(data);
+}
+
+function persistRefreshedSession(session: AuthSession) {
+  const authState = useAuthStore.getState();
+  useAuthStore.getState().setAuth(
+    session.token,
+    authState.user
+      ? {
+          ...authState.user,
+          ...session.user
+        }
+      : session.user,
+    session.refreshToken ?? authState.refreshToken,
+    session.accessTokenExpiresAt,
+    session.refreshTokenExpiresAt
+  );
+}
+
+export async function ensureValidAccessToken(forceRefresh = false): Promise<string> {
+  const authState = useAuthStore.getState();
+
+  if (!authState.token) {
+    throw new Error('Missing auth token');
+  }
+
+  const hasRefreshToken = Boolean(authState.refreshToken);
+  const refreshTokenExpired =
+    typeof authState.refreshTokenExpiresAt === 'number' && authState.refreshTokenExpiresAt <= Date.now();
+
+  if (refreshTokenExpired) {
+    useAuthStore.getState().clearAuth();
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  const shouldRefresh =
+    forceRefresh ||
+    (hasRefreshToken &&
+      typeof authState.accessTokenExpiresAt === 'number' &&
+      authState.accessTokenExpiresAt - Date.now() <= ACCESS_TOKEN_REFRESH_BUFFER_MS);
+
+  if (!shouldRefresh) {
+    return authState.token;
+  }
+
+  if (!authState.refreshToken) {
+    return authState.token;
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken(authState.refreshToken)
+      .then((session) => {
+        persistRefreshedSession(session);
+        return session;
+      })
+      .catch((error) => {
+        useAuthStore.getState().clearAuth();
+        throw error;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  const refreshed = await refreshInFlight;
+  return refreshed.token;
 }
