@@ -37,7 +37,7 @@ export default function DashboardLayout() {
 
         <div className="insurer-badge">
           <div className="label">Logged in as</div>
-          <div className="name">{user?.insurer ?? 'Bajaj Allianz General Insurance'}</div>
+          <div className="name">{user?.insurer ?? 'Bajaj General Insurance'}</div>
         </div>
 
         <nav className="nav">

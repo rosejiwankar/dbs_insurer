@@ -61,7 +61,8 @@ export default function VehicleLookup() {
   const formatWindowMonth = (date: Date) => date.toLocaleString('en-US', { month: 'short', year: 'numeric' });
   const formatDateTime = (value?: string) =>
     value
-      ? new Date(value).toLocaleString('en-IN', {
+      ? new Date(value + 'Z').toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
           day: '2-digit',
           month: 'short',
           year: 'numeric',
@@ -70,7 +71,7 @@ export default function VehicleLookup() {
         })
       : 'N/A';
   const formatDate = (value?: string) =>
-    value ? new Date(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+    value ? new Date(value + 'Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
   const gaugeColor = selected ? scoreColor(selected.band) : '#16a34a';
   const activeGaugeStroke = selected?.band === 'EXTREME_RISK' ? gaugeColor : 'url(#arcGradActive)';
 
